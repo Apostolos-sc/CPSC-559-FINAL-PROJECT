@@ -60,17 +60,17 @@ def execute_query(connection, query):
 
 
 create_questions_table = '''
-CREATE TABLE questions (
+CREATE TABLE IF NOT EXISTS questions (
     question_id INT PRIMARY KEY,
-    question VARCHAR(2000) NOT NULL,
-    answer VARCHAR(100) NOT NULL,
-    option_1 VARCHAR(100) NOT NULL,
-    option_2 VARCHAR(100) NOT NULL,
-    option_3 VARCHAR(100) NOT NULL,
-    option_4 VARCHAR(100) NOT NULL
+    question VARCHAR(3000) NOT NULL,
+    answer VARCHAR(1000) NOT NULL,
+    option_1 VARCHAR(1000) NOT NULL,
+    option_2 VARCHAR(1000) NOT NULL,
+    option_3 VARCHAR(1000) NOT NULL,
+    option_4 VARCHAR(1000) NOT NULL
 );'''
 
-#execute_query(connection, create_questions_table)
+execute_query(connection, create_questions_table)
 
 
 files = open('history.txt', 'r+')
@@ -84,9 +84,10 @@ rows = [(1,7,3000), (1,8,3500), (1,9,3900)]
 values = ', '.join(map(str, rows))
 sql = "INSERT INTO ... VALUES {}".format(values)
 '''
+question_bank = []
 
 length = len(content)
-i = 0
+i, counter = 0,1
 while i < length:
     if len(content[i].strip()) == 0: 
         i+=1
@@ -102,11 +103,18 @@ while i < length:
             if line[4][0]!='C':
                 i+=4 
                 continue
-            question_bank.append((i//7,line[0][3:-1],line[1][2:-1],line[2][2:-1],
+            question_bank.append((counter,line[0][3:-1],line[1][2:-1],line[2][2:-1],
                 line[3][2:-1],line[4][2:-1],line[5][2:-1]))
             i+=6
+            counter+=1
     i+=1
 
-print(question_bank)
+#print(question_bank)
+
+values = ', '.join(map(str,question_bank))
+table_name = 'questions'
+insert_questions = "INSERT INTO {} VALUES {}".format(table_name, values)
+execute_query(connection, insert_questions)
+
 
 
