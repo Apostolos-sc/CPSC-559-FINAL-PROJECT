@@ -1,8 +1,6 @@
 
 import mysql.connector
 from mysql.connector import Error
-import pandas as pd
-
 
 def create_server_connection(host_name, user_name, user_password):
     connection = None
@@ -26,7 +24,6 @@ def create_database(connection, query):
         print('Database created successfully')
     except Error as err:
         print(f"Error '{err}'")
- 
 
 
 create_db_query = 'CREATE DATABASE IF NOT EXISTS houseOfTrivia'
@@ -72,18 +69,8 @@ CREATE TABLE IF NOT EXISTS {0} (
 
 execute_query(connection, create_questions_table)
 
-
 files = open('history.txt', 'r+')
 content = files.readlines()
-
-
-'''
-Writing multiple rows into sql database using python, create a list of 
-tuples and follow the example code below
-rows = [(1,7,3000), (1,8,3500), (1,9,3900)]
-values = ', '.join(map(str, rows))
-sql = "INSERT INTO ... VALUES {}".format(values)
-'''
 question_bank = []
 
 length = len(content)
@@ -112,6 +99,4 @@ while i < length:
 values = ', '.join(map(str,question_bank))
 insert_questions = "INSERT INTO {} VALUES {}".format(table_name, values)
 execute_query(connection, insert_questions)
-
-
 
