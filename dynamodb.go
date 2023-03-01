@@ -25,37 +25,71 @@ sess := session.Must(session.NewSessionWithOptions(session.Optons{
 
 db_client := dynamodb.New(sess)
 
-id_filter := expression.Name("question_id").Equal(Expression.Value(year))
-questions_format := expression.NameList(
-    expression.Name("question_id"),
-    expression.Name("question"),
-    expression.Name("answer"),
-    expression.Name("option_1"),
-    expression.Name("option_2"),
-    expression.Name("option_3"),
-    expression.Name("option_4"))
 
-expr, err := expression.NewBuilder().WithFilter(id_filter).WithProjection(question_format).Build()
-if err != nil {params := &dynamodb.ScanInput{
+func read() {
+    id_filter := expression.Name("question_id").Equal(Expression.Value(year))
+    questions_format := expression.NameList(
+        expression.Name("question_id"),
+        expression.Name("question"),
+        expression.Name("answer"),
+        expression.Name("option_1"),
+        expression.Name("option_2"),
+        expression.Name("option_3"),
+        expression.Name("option_4"))
+
+    expr, err := expression.NewBuilder().WithFilter(id_filter).WithProjection(question_format).Build()
+    if err != nil {
     log.Fatalf("Got error building expression: %s", err)
+    }
+
+    // Build the query input parameters
+    params := &dynamodb.ScanInput{
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
+        FilterExpression:          expr.Filter(),
+        ProjectionExpression:      expr.Projection(),
+        TableName:                 aws.String(tableName),
+    }
+
+    // Make the DynamoDB Query API call
+    result, err := db_client.Scan(params)
+    if err != nil {
+        log.Fatalf("Query API call failed: %s", err)
+    }
+
+    fmt.Println(result[0].question)
 }
 
-// Build the query input parameters
-params := &dynamodb.ScanInput{
-    ExpressionAttributeNames:  expr.Names(),
-    ExpressionAttributeValues: expr.Values(),
-    FilterExpression:          expr.Filter(),
-    ProjectionExpression:      expr.Projection(),
-    TableName:                 aws.String(tableName),
+
+func write(){
+    item := Item{
+        id: 0,
+        question: "World's second largest Country",
+        answer: "Canada",
+        option_1: "USA",
+        option_2: "Canada",
+        option_3: "Australia",
+        option_4: "Russia"
+    }
+
+    av, err := dynamodbattribute.MarshalMap(item)
+    if err != nil {
+        log.Fatalf("Got error marshalling new movie item: %s", err)
+    }
+
+    tableName := "questions"
+    input := &dynamodb.PutItemInput{
+        Item:      av,
+        TableName: aws.String(tableName),
+    }
+
+    _, err = db_client.PutItem(input)
+    if err != nil {
+        log.Fatalf("Got error calling PutItem: %s", err)
+    }
 }
 
-// Make the DynamoDB Query API call
-result, err := db_client.Scan(params)
-if err != nil {
-    log.Fatalf("Query API call failed: %s", err)
-}
 
-fmt.Println(result[0].question)
 
 
 
