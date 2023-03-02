@@ -73,7 +73,7 @@ func clientListener() {
 
 	//Continuously Listen for Client Connections
 	for {
-		//Serve Clients
+		//Server Clients
 		conn, err:= listener.Accept()
 		if err != nil {
 			log.Fatal(err)
@@ -113,7 +113,7 @@ func serverListener () {
 		go handleServerRegistration(conn)
 	}
 }
-
+//handle 
 func handleClientRequest(conn net.Conn) {
 	//Handle Client Request Here
 	buffer := make([]byte, 1024)

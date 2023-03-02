@@ -59,12 +59,14 @@ func main() {
 	
 		//Continuously Listen for game Connections
 		for {
+			//infinite listening
 			conn, err:= listener.Accept()
 			if err != nil {
 				log.Fatal(err)
 				os.Exit(1)
 			}
 			fmt.Printf("Incoming connection from : %s\n", conn.RemoteAddr().String())
+			//Sub routine is called and we pass to it the connection parameter to be handled
 			go handleGameConnection(conn)
 		}
 	} else {
@@ -76,6 +78,17 @@ func main() {
 //of the form key=> value : (accessCode => 1). If the accessCode is not found, assume that
 //the server crashed and we are requesting from this server to assume responsibility of the
 //game. Pull the game data from the database
+
+//Note -> READY implementation potentially, or force start by host. Decide with frontend -> Danny
+//Note -> At the end of each round when the clients send the answer, the server will send back the
+//points and the next question.
+
+//User attaches unique ID, after each command Request :userID at the end.
+
+//What happens if the user disconnects. What do we do. username -> points
+
+//Assumption for now that the user doesn't disconnect, he just keeps playing till game is over.
+//generate UserID as unique identifier, screen name is chosen, can be the same with other people's name.
 func handleGameConnection(conn net.Conn) {
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)
@@ -85,9 +98,11 @@ func handleGameConnection(conn net.Conn) {
 	var command []string = strings.Split(string(buffer[:n]), ":")
 	//If message received is create room, send game Room Access Code
 	if strings.Compare(command[0], "Create Room") == 0 {
+		//Create Room:username
 		//Create a gameRoom in the database and then keep track in memory
 		//Game Connection Attempt.
 		//Call function that generates access code
+		//add user to game room in database (command[1] stored in db)
 		conn.Write([]byte("Game Room:"+generateAccessCode()))
 		n, err = conn.Read(buffer)
 		if err != nil {
@@ -119,7 +134,7 @@ func handleGameConnection(conn net.Conn) {
 				}
 			}
 		} else if strings.Compare(command[0], "Start Game") == 0 {
-			//Requesting to start a game - has to round 0
+			//Requesting to start a game - has to be round 0
 			if gameRooms == nil {
 				//there are no rooms loaded check db
 				//run db script to get gameRoom with accessCode selected
