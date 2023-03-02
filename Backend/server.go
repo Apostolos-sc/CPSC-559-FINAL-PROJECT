@@ -3,8 +3,11 @@
 //Last Edited By : Apostolos Scondrianis
 //Last Edit On   : 01-03-2023
 //Filename       : server.go
-//Version        : 0.2
+//Version        : 0.3
 
+// Hashmap may be an issue? Maybe we want multiple servers to handle
+// the same gameRoom incase one server is overly busy, think about
+// during fault tolerance, replication stage, scalability
 package main
 
 import (
@@ -12,8 +15,8 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
 	"strings"
+	"sync"
 )
 
 type connection struct {
@@ -21,6 +24,17 @@ type connection struct {
 	port string;
 	con_type string;
 }
+
+type gameRoom struct {
+	accessCode string
+}
+
+var (
+	gameRoomsMutex sync.Mutex
+	gameRooms map[string] int
+)
+
+var MAX_PLAYERS int = 4
 var PROXY = connection{"127.0.0.1", "9000", "tcp"}
 var GAME_SERVICE = connection{"127.0.0.1", "8080", "tcp"}
 
@@ -43,7 +57,7 @@ func main() {
 		//close Listener
 		defer listener.Close()
 	
-		//Continuously Listen for connections
+		//Continuously Listen for game Connections
 		for {
 			conn, err:= listener.Accept()
 			if err != nil {
@@ -51,41 +65,107 @@ func main() {
 				os.Exit(1)
 			}
 			fmt.Printf("Incoming connection from : %s\n", conn.RemoteAddr().String())
-			go handleGameRequest(conn)
+			go handleGameConnection(conn)
 		}
 	} else {
 		fmt.Println("Failed to register server at the proxy.")
 	}
 }
 
-func handleGameRequest(conn net.Conn) {
+//Hashmaps have an access speed of O(1). So we decide to hold the accessCodes in hashmaps
+//of the form key=> value : (accessCode => 1). If the accessCode is not found, assume that
+//the server crashed and we are requesting from this server to assume responsibility of the
+//game. Pull the game data from the database
+func handleGameConnection(conn net.Conn) {
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if strings.Compare(string(buffer[:n]), "Game Room") == 0 {
+	var command []string = strings.Split(string(buffer[:n]), ":")
+	//If message received is create room, send game Room Access Code
+	if strings.Compare(command[0], "Create Room") == 0 {
+		//Create a gameRoom in the database and then keep track in memory
 		//Game Connection Attempt.
-		conn.Write([]byte("Game Room ID"))
+		//Call function that generates access code
+		conn.Write([]byte("Game Room:"+generateAccessCode()))
 		n, err = conn.Read(buffer)
 		if err != nil {
 			log.Fatal(err)
 		}
-		roomID, err := strconv.Atoi(string(buffer[:n]))
-		if err != nil {
-			fmt.Println("Error during conversion")
-		} else {
-			fmt.Printf("Proxy wants us to handle Game Room with ID %d\n", roomID)
+	} else if strings.Compare(command[0], "Join Room") == 0 {
+		//Check if a user wants to join a room. command[0] should contain the command and command[1] should contain the access code.
+		//command[2] should contain the username
+		if(len(command) == 2) {
+			//the command has 2 elements, let's check if the second element is a valid game room code.
+			//First check the hasmap
+			gameRoomsMutex.Lock()
+			if gameRooms == nil {
+				//there are no rooms loaded check db
+				//run db script to get gameRoom with accessCode selected
+				gameRooms = make(map[string]int)
+				//add accessCode once read
+			} else {
+				//we don't care about the value so _ representes that, ok will be true if the accessCode exists
+				_, ok := gameRooms[command[1]]
+				if ok {
+					//return successfully joined
+					//add user to the room in the db, command[2] should be the username.
+					//client side should make sure username is valid before sending
+					//return JOIN_SUCCESS
+				} else {
+					//accessCode doesn't exist in the map, access db and add to the hashmap if it's a real code
+					//if it's not real there is an error. Return ROOM_CODE_ERROR
+				}
+			}
+		} else if strings.Compare(command[0], "Start Game") == 0 {
+			//Requesting to start a game - has to round 0
+			if gameRooms == nil {
+				//there are no rooms loaded check db
+				//run db script to get gameRoom with accessCode selected
+				gameRooms = make(map[string]int)
+				//add accessCode once read
+			} else {
+				//we don't care about the value so _ representes that, ok will be true if the accessCode exists
+				_, ok := gameRooms[command[1]]
+				if ok {
+					//return successfully joined
+					//generate questions for the game Room
+					if (generateQuestions(command[1])) {
+						//if successfully generated questions send
+						//question to the proxy, and proxy sends questions to clients
+					} else {
+						//there was an issue with generating questions
+						//send back ROOM_GENERATE_QUESTIONS_ERROR
+					}
+				} else {
+					//accessCode doesn't exist in the map, access db and add to the hashmap if it's a real code
+					//if it's not real there is an error. Return ROOM_CODE_ERROR
+				}
+			}
+
 		}
-	} else {
 		fmt.Println("Invalid Option Given by the proxy.")
 	}
 	// close conn
 	conn.Close()
 }
 
+func generateAccessCode() string {
+	//write code that generates access code, must be unique
+	var accessCode string = "test"
+	return accessCode
+}
+
+func generateQuestions(accessCode string) bool {
+	//read DB and generate 10 random questions.
+	//return true if we successfully added them to the database
+	return true
+}
+
 //Returns true if the proxy accepts the connection.
 func connectToProxy() bool {
+	//connection type, IpAddres:Port
 	proxyAddr, err := net.ResolveTCPAddr(PROXY.con_type, PROXY.host+":"+PROXY.port)
 	if err != nil {
 		fmt.Println("ResolveTCPAddr failed:", err.Error())
@@ -114,6 +194,7 @@ func connectToProxy() bool {
 	if strings.Compare(string(received[:n]), "Accepted") == 0 {
 		//If the proxy accepted us, send the address we will be serving at
 		fmt.Printf("Received message: %s.\n", string(received[:n]))
+		//Create a string IpAddress:PortNumber
 		var gameServiceAddress = GAME_SERVICE.host+":"+GAME_SERVICE.port
 		_, err = conn.Write([]byte(gameServiceAddress))
 		if(err != nil) {

@@ -18,25 +18,35 @@ import (
 	"time"
 )
 
-//Connection informatio
+//Connection information
 type connection struct {
 	host string;
 	port string;
 	con_type string;
 }
-//gameRoom ID and the connection that will service it
+//gameRoom with an access Code and a server that will serve
 type gameRoom struct {
-	ID int;
-	server net.Conn;
+	accessCode string;
+	server connection;
 }
+
+//Maximum number of game rooms a server should handle
+var MAX_ROOMS_PER_SERVER int = 2
 //Address to be listening for servers to indicate they want to serve
 var SERVER_REGISTRATION = connection {"127.0.0.1", "9000", "tcp"}
 //Address to be listening for clients
 var CLIENT_SERVICE = connection {"127.0.0.1", "8000", "tcp"}
 //Will be used to keep track of servers that are servicing
+//make hashmap here when back from soccer
 var (
-	mu sync.Mutex
-	servers_slice[] connection
+	serverMutex sync.Mutex
+	serversSlice[] connection
+	totalGamesServing[] int
+)
+//Will be used to keep track of the gameRooms being serviced
+var (
+	gameRoomMutex sync.Mutex
+	gameRoomsSlice[] gameRoom
 )
 
 func main() {
@@ -106,8 +116,16 @@ func serverListener () {
 
 func handleClientRequest(conn net.Conn) {
 	//Handle Client Request Here
+	buffer := make([]byte, 1024)
+	n, err := conn.Read(buffer)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if strings.Compare(string(buffer[:n]), "Create Room") == 0 {
+		//Client wants to create a game room - Handle game room
+		
+	}
 }
-
 
 func handleServerRegistration(conn net.Conn) {
 	//Server Registration Handler
@@ -132,19 +150,25 @@ func handleServerRegistration(conn net.Conn) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		//assume that the address that the server will be will listening for 
+		//game room service requests
 		host, port, err = net.SplitHostPort(string(buffer[:n]))
 		if err != nil {
 			fmt.Println(err)
 		} else {
 			fmt.Printf("")
-			mu.Lock()
-			servers_slice = append(servers_slice, connection{host:host, port:port, con_type:"tcp"})
-			mu.Unlock()
+			serverMutex.Lock()
+			//Add server data on the server slice
+			serversSlice = append(serversSlice, connection{host:host, port:port, con_type:"tcp"})
+			//set total number of games serving to zero
+			totalGamesServing = append(totalGamesServing, 0)
+			serverMutex.Unlock()
 			fmt.Printf("%s was added as a server on the server list on %v.\n", string(buffer[:n]), time)
+			//send back that address was received to let know the server that all is OKAY
 			conn.Write([]byte("Received Address"))
 		}
 	} else {
-		conn.Write([]byte("Your registration as a server is declined."))
+		conn.Write([]byte("Wrong command given, access declined."))
 	}
 	// close conn
 	conn.Close()
