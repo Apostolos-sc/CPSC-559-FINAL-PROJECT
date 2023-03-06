@@ -18,35 +18,40 @@ import (
 	"time"
 )
 
-//Connection information
+// Connection information
 type connection struct {
-	host string;
-	port string;
-	con_type string;
-}
-//gameRoom with an access Code and a server that will serve
-type gameRoom struct {
-	accessCode string;
-	conn *net.TCPConn
+	host     string
+	port     string
+	con_type string
 }
 
-//Maximum number of game rooms a server should handle
+// gameRoom with an access Code and a server that will serve
+type gameRoom struct {
+	accessCode string
+	conn       *net.TCPConn
+}
+
+// Maximum number of game rooms a server should handle
 var MAX_ROOMS_PER_SERVER int = 2
-//Address to be listening for servers to indicate they want to serve
-var SERVER_REGISTRATION = connection {"127.0.0.1", "9000", "tcp"}
-//Address to be listening for clients
-var CLIENT_SERVICE = connection {"127.0.0.1", "8000", "tcp"}
-//Will be used to keep track of servers that are servicing
-//make hashmap here when back from soccer
+
+// Address to be listening for servers to indicate they want to serve
+var SERVER_REGISTRATION = connection{os.Getenv("HOST"), os.Getenv("PORT"), "tcp"}
+
+// Address to be listening for clients
+var CLIENT_SERVICE = connection{os.Getenv("HOST"), "8000", "tcp"}
+
+// Will be used to keep track of servers that are servicing
+// make hashmap here when back from soccer
 var (
-	serverMutex sync.Mutex
-	serversSlice[] connection
-	totalGamesServing[] int
+	serverMutex       sync.Mutex
+	serversSlice      []connection
+	totalGamesServing []int
 )
-//Will be used to keep track of the gameRooms being serviced
+
+// Will be used to keep track of the gameRooms being serviced
 var (
-	gameRoomMutex sync.Mutex
-	gameRoomsSlice[] gameRoom
+	gameRoomMutex  sync.Mutex
+	gameRoomsSlice []gameRoom
 )
 
 func main() {
@@ -74,7 +79,7 @@ func clientListener() {
 	//Continuously Listen for Client Connections
 	for {
 		//Serve Clients
-		conn, err:= listener.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			log.Fatal(err)
 			os.Exit(1)
@@ -84,7 +89,7 @@ func clientListener() {
 	}
 }
 
-func serverListener () {
+func serverListener() {
 	// Resolve TCP Address
 	//Address to be listening on
 	serverRegistrationTCPAddr, err := net.ResolveTCPAddr(SERVER_REGISTRATION.con_type, SERVER_REGISTRATION.host+":"+SERVER_REGISTRATION.port)
@@ -104,7 +109,7 @@ func serverListener () {
 
 	//Continuously Listen for connections
 	for {
-		conn, err:= listener.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			log.Fatal(err)
 			os.Exit(1)
@@ -113,8 +118,9 @@ func serverListener () {
 		go handleServerRegistration(conn)
 	}
 }
-//handle Client Request. If Game Room pipeline is created maybe we need to set a timeout before
-//a game room is utilized or just time out the room?
+
+// handle Client Request. If Game Room pipeline is created maybe we need to set a timeout before
+// a game room is utilized or just time out the room?
 func handleClientRequest(clientConn net.Conn) {
 	//Handle Client Request Here
 	buffer := make([]byte, 1024)
@@ -124,7 +130,7 @@ func handleClientRequest(clientConn net.Conn) {
 	}
 	//critical access
 	serverMutex.Lock()
-	if(len(serversSlice) == 0) {
+	if len(serversSlice) == 0 {
 		serverMutex.Unlock()
 		//Can't service Client, no live Servers.
 		fmt.Println("There are no servers available to service Clients. Send Error to Client. Connection Terminated.")
@@ -138,7 +144,7 @@ func handleClientRequest(clientConn net.Conn) {
 	}
 	serverMutex.Unlock()
 	var command []string = strings.Split(string(buffer[:n]), ":")
-	if(len(command) != 1) {
+	if len(command) != 1 {
 		if strings.Compare(command[0], "Create Room") == 0 {
 			//Check if username was sent with the request before creating room (NOT DONE!)
 			//arbitrary select the first server, will write algorithm later
@@ -191,7 +197,7 @@ func handleClientRequest(clientConn net.Conn) {
 					os.Exit(1)
 				}
 				//Send to client success message.
-				_, err = clientConn.Write([]byte("Access Code:"+response[1]))
+				_, err = clientConn.Write([]byte("Access Code:" + response[1]))
 				if err != nil {
 					fmt.Println("Write data failed:", err.Error())
 					os.Exit(1)
@@ -204,7 +210,7 @@ func handleClientRequest(clientConn net.Conn) {
 				if strings.Compare(string(buffer[:n]), "Access Code Received.") == 0 {
 					//Acknowledgement received
 					fmt.Printf("Client with username %s & IP address %s received the Access Code.\n", command[1], clientConn.RemoteAddr().String())
-				} else{
+				} else {
 					//neeeded? -> clean up
 					fmt.Printf("Something went wrong. Deal with it Programmer :P\n")
 					//Corrupt message or no acknowledgement? check. -> timeout implementation
@@ -263,7 +269,7 @@ func handleServerRegistration(conn net.Conn) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		//assume that the address that the server will be will listening for 
+		//assume that the address that the server will be will listening for
 		//game room service requests
 		host, port, err = net.SplitHostPort(string(buffer[:n]))
 		if err != nil {
@@ -272,7 +278,7 @@ func handleServerRegistration(conn net.Conn) {
 			fmt.Printf("")
 			serverMutex.Lock()
 			//Add server data on the server slice
-			serversSlice = append(serversSlice, connection{host:host, port:port, con_type:"tcp"})
+			serversSlice = append(serversSlice, connection{host: host, port: port, con_type: "tcp"})
 			//set total number of games serving to zero
 			totalGamesServing = append(totalGamesServing, 0)
 			serverMutex.Unlock()

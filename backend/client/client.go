@@ -17,13 +17,13 @@ import (
 )
 
 type connection struct {
-	host string;
-	port string;
-	con_type string;
+	host     string
+	port     string
+	con_type string
 }
 
-//Address that the proxy listens for clients
-var PROXY = connection {"127.0.0.1", "8000", "tcp"}
+// Address that the proxy listens for clients
+var PROXY = connection{"127.0.0.1", "8000", "tcp"}
 
 var USERNAME string = "testUser"
 

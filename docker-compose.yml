@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+  proxy:
+    image: proxy
+    build: ./backend/proxy
+    environment:
+      HOST: proxy
+      PORT: 9000
+    ports:
+      - "8000:8000"
+
+  server1:
+    image: server
+    build: ./backend/server
+    depends_on:
+      - proxy
+    environment:
+      PROXY_HOST: proxy
+      PROXY_PORT: 9000
+
+  server2:
+    image: server
+    build: ./backend/server
+    depends_on:
+      - proxy
+    environment:
+      PROXY_HOST: proxy
+      PROXY_PORT: 9000

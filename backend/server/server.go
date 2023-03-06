@@ -20,9 +20,9 @@ import (
 )
 
 type connection struct {
-	host string;
-	port string;
-	con_type string;
+	host     string
+	port     string
+	con_type string
 }
 
 type gameRoom struct {
@@ -31,22 +31,22 @@ type gameRoom struct {
 
 var (
 	gameRoomsMutex sync.Mutex
-	gameRooms map[string] int
+	gameRooms      map[string]int
 )
 
 var MAX_PLAYERS int = 4
-var PROXY = connection{"127.0.0.1", "9000", "tcp"}
+var PROXY = connection{os.Getenv("PROXY_HOST"), os.Getenv("PROXY_PORT"), "tcp"}
 var GAME_SERVICE = connection{"127.0.0.1", "8080", "tcp"}
 
 func main() {
-	if(connectToProxy()) {
+	if connectToProxy() {
 		//Listen for Game Service Requests if you were successfully registered at the Proxy
 		fmt.Println("Successful registration to proxy.")
 		gameServiceTCPAddr, err := net.ResolveTCPAddr(GAME_SERVICE.con_type, GAME_SERVICE.host+":"+GAME_SERVICE.port)
 		if err != nil {
 			fmt.Printf("Unable to resolve IP")
 		}
-	
+
 		// Start TCP Listener for the server
 		listener, err := net.ListenTCP("tcp", gameServiceTCPAddr)
 		if err != nil {
@@ -56,11 +56,11 @@ func main() {
 		}
 		//close Listener
 		defer listener.Close()
-	
+
 		//Continuously Listen for game Connections
 		for {
 			//infinite listening
-			conn, err:= listener.Accept()
+			conn, err := listener.Accept()
 			if err != nil {
 				log.Fatal(err)
 				os.Exit(1)
@@ -87,8 +87,8 @@ func main() {
 
 //What happens if the user disconnects. What do we do. username -> points
 
-//Assumption for now that the user doesn't disconnect, he just keeps playing till game is over.
-//generate UserID as unique identifier, screen name is chosen, can be the same with other people's name.
+// Assumption for now that the user doesn't disconnect, he just keeps playing till game is over.
+// generate UserID as unique identifier, screen name is chosen, can be the same with other people's name.
 func handleGameConnection(conn net.Conn) {
 	//each game Room Connection should be handled till the game is over
 	//might wanna check and see if the game request is in proper format / incase of data corruption.
@@ -112,8 +112,8 @@ func handleGameConnection(conn net.Conn) {
 			//Call function that generates access code
 			//add user to game room in database (command[1] stored in db)
 			//Wait for Acknowledgement
-			var accessCode  string = generateAccessCode()
-			conn.Write([]byte("Room Created:"+accessCode))
+			var accessCode string = generateAccessCode()
+			conn.Write([]byte("Room Created:" + accessCode))
 			if err != nil {
 				fmt.Println("Write data failed:", err.Error())
 				os.Exit(1)
@@ -144,7 +144,7 @@ func handleGameConnection(conn net.Conn) {
 		} else if strings.Compare(command[0], "Join Room") == 0 {
 			//Check if a user wants to join a room. command[0] should contain the command and command[1] should contain the access code.
 			//command[2] should contain the username
-			if(len(command) == 2) {
+			if len(command) == 2 {
 				//the command has 2 elements, let's check if the second element is a valid game room code.
 				//First check the hasmap
 				gameRoomsMutex.Lock()
@@ -180,7 +180,7 @@ func handleGameConnection(conn net.Conn) {
 					if ok {
 						//return successfully joined
 						//generate questions for the game Room
-						if (generateQuestions(command[1])) {
+						if generateQuestions(command[1]) {
 							//if successfully generated questions send
 							//question to the proxy, and proxy sends questions to clients
 						} else {
@@ -218,7 +218,7 @@ func generateQuestions(accessCode string) bool {
 	return true
 }
 
-//Returns true if the proxy accepts the connection.
+// Returns true if the proxy accepts the connection.
 func connectToProxy() bool {
 	//connection type, IpAddres:Port
 	proxyAddr, err := net.ResolveTCPAddr(PROXY.con_type, PROXY.host+":"+PROXY.port)
@@ -250,9 +250,9 @@ func connectToProxy() bool {
 		//If the proxy accepted us, send the address we will be serving at
 		fmt.Printf("Received message: %s.\n", string(received[:n]))
 		//Create a string IpAddress:PortNumber
-		var gameServiceAddress = GAME_SERVICE.host+":"+GAME_SERVICE.port
+		var gameServiceAddress = GAME_SERVICE.host + ":" + GAME_SERVICE.port
 		_, err = conn.Write([]byte(gameServiceAddress))
-		if(err != nil) {
+		if err != nil {
 			fmt.Println("Write data failed:", err.Error())
 			os.Exit(1)
 		} else {
@@ -266,11 +266,11 @@ func connectToProxy() bool {
 				if strings.Compare(string(received[:n]), "Received Address") == 0 {
 					fmt.Printf("Received message: %s.\n", string(received[:n]))
 					conn.Close()
-					return true;
+					return true
 				}
 			}
 		}
 	}
 	conn.Close()
-	return false;
+	return false
 }
