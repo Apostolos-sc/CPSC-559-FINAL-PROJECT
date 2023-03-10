@@ -15,19 +15,19 @@ def create_server_connection(host_name, user_name, user_password):
         print(f"Error:'{err}'")
     return connection
 
-connection = create_server_connection('127.0.0.1', 'root', 'password')
+connection = create_server_connection('localhost', 'root', 'password')
 
-def create_database(connection, query):
-    cursor = connection.cursor()
-    try:
-        cursor.execute(query)
-        print('Database created successfully')
-    except Error as err:
-        print(f"Error '{err}'")
-
-
-create_db_query = 'CREATE DATABASE IF NOT EXISTS houseOfTrivia'
-create_database(connection, create_db_query)
+# def create_database(connection, query):
+#     cursor = connection.cursor()
+#     try:
+#         cursor.execute(query)
+#         print('Database created successfully')
+#     except Error as err:
+#         print(f"Error '{err}'")
+#
+#
+# create_db_query = 'CREATE DATABASE IF NOT EXISTS mydb'
+# create_database(connection, create_db_query)
 
 def create_db_connection(host_name, user_name, user_password, db_name):
     connection = None
@@ -43,7 +43,7 @@ def create_db_connection(host_name, user_name, user_password, db_name):
         print(f"Error:'{err}'")
     return connection
 
-connection = create_db_connection('localhost', 'root', 'password', 'houseOfTrivia')
+connection = create_db_connection('localhost', 'root', 'password', 'mydb')
 
 def execute_query(connection, query):
     cursor = connection.cursor()

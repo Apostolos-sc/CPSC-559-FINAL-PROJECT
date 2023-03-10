@@ -11,6 +11,8 @@ services:
     volumes:
       - ./master/conf/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
       - ./master/data:/var/lib/mysql
+      - ./history.txt:/history.txt
+      - ./db.py:/db.py
     networks:
       - overlay
 
