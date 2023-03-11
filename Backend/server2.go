@@ -36,7 +36,7 @@ var (
 
 var MAX_PLAYERS int = 4
 var PROXY = connection{"127.0.0.1", "9000", "tcp"}
-var GAME_SERVICE = connection{"127.0.0.1", "8082", "tcp"}
+var GAME_SERVICE = connection{"127.0.0.1", "8081", "tcp"}
 
 func main() {
 	if(connectToProxy()) {
@@ -100,6 +100,7 @@ func handleGameConnection(conn net.Conn) {
 		buffer := make([]byte, 1024)
 		n, err := conn.Read(buffer)
 		if err != nil {
+			fmt.Printf("Error receiving the command.\n")
 			log.Fatal(err)
 		}
 		//we should make sure the Protocol is enforced. There is some if statements missing here in each option
@@ -140,7 +141,6 @@ func handleGameConnection(conn net.Conn) {
 			} else {
 				//Corrupt message from the proxy??
 				fmt.Printf("Proxy replied with %s\n", string(buffer[:n]))
-				// close conn
 			}
 			//potential error handling here - think
 		} else if strings.Compare(command[0], "Join Room") == 0 {
@@ -199,13 +199,13 @@ func handleGameConnection(conn net.Conn) {
 				//added arbirtrarily so the compiler doesn't complain. More logic to be done.
 				//code is getting very long, hard to maintain. Might need to write functions for each
 				//command
-				// close conn
-				conn.Close()
 				break
 			}
 			fmt.Println("Invalid Option Given by the proxy.")
 		}
 	}
+	// close conn
+	conn.Close()
 }
 
 func generateAccessCode() string {
