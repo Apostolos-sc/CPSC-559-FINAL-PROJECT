@@ -35,8 +35,8 @@ var (
 )
 
 var MAX_PLAYERS int = 4
-var PROXY = connection{"127.0.0.1", "9000", "tcp"}
-var GAME_SERVICE = connection{"127.0.0.1", "8082", "tcp"}
+var PROXY = connection{"10.0.0.2", "9000", "tcp"}
+var GAME_SERVICE = connection{"10.0.0.2", "8082", "tcp"}
 
 func main() {
 	if(connectToProxy()) {
@@ -44,26 +44,29 @@ func main() {
 		fmt.Println("Successful registration to proxy.")
 		gameServiceTCPAddr, err := net.ResolveTCPAddr(GAME_SERVICE.con_type, GAME_SERVICE.host+":"+GAME_SERVICE.port)
 		if err != nil {
-			fmt.Printf("Unable to resolve IP")
+			fmt.Printf("Unable to resolve Address for Listening for game connections : %s:%s error : %s\n", GAME_SERVICE.host, GAME_SERVICE.port, err.Error())
+			//If we can't resolve address there is not much we can do on the server side. Might as well just shut er' down.s
+			os.Exit(1)
 		}
 	
 		// Start TCP Listener for the server
 		listener, err := net.ListenTCP("tcp", gameServiceTCPAddr)
 		if err != nil {
-			fmt.Printf("Unable to start listener - %s", err)
+			fmt.Printf("Unable to start listener - at address : %s:%s, %s", GAME_SERVICE.host, GAME_SERVICE.port, err)
 		} else {
 			fmt.Printf("Listening on %v:%v\n", GAME_SERVICE.host, GAME_SERVICE.port)
 		}
-		//close Listener
+		//close Listener when the go routine is over
+		//Will see if we can decide on a mechanism to start and shut down servers gracefully later.
 		defer listener.Close()
 	
 		//Continuously Listen for game Connections
 		for {
-			//infinite listening
-			conn, err:= listener.Accept()
+			//infinite listening - blocks while waiting in this go routine
+			conn, err:= listener.AcceptTCP()
 			if err != nil {
-				log.Fatal(err)
-				os.Exit(1)
+				fmt.Printf("There was an error in Accepting the connection. Error : %s\n", err.Error())
+				//Error with listener? Should we read from keyboard for IP Address and port to listen to ?
 			}
 			fmt.Printf("Incoming connection from : %s\n", conn.RemoteAddr().String())
 			//Sub routine is called and we pass to it the connection parameter to be handled

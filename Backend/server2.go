@@ -35,8 +35,8 @@ var (
 )
 
 var MAX_PLAYERS int = 4
-var PROXY = connection{"127.0.0.1", "9000", "tcp"}
-var GAME_SERVICE = connection{"127.0.0.1", "8081", "tcp"}
+var PROXY = connection{"10.0.0.87", "9000", "tcp"}
+var GAME_SERVICE = connection{"10.0.0.24", "8081", "tcp"}
 
 func main() {
 	if(connectToProxy()) {
