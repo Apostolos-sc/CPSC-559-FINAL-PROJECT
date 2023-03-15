@@ -23,7 +23,7 @@ type connection struct {
 }
 
 //Address that the proxy listens for clients
-var PROXY = connection {"127.0.0.1", "8000", "tcp"}
+var PROXY = connection {"68.146.50.113", "8000", "tcp"}
 
 var USERNAME string = "testUser"
 
