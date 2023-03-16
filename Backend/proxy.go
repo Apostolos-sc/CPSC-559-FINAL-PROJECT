@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/http"
+	"github.com/gorilla/websocket"
 )
 
 //Connection information
@@ -38,7 +40,7 @@ var MAX_ROOMS_PER_SERVER int = 2
 //Address to be listening for servers to indicate they want to serve
 var SERVER_REGISTRATION = connection {"10.0.0.2", "9000", "tcp"}
 //Address to be listening for clients
-var CLIENT_SERVICE = connection {"10.0.0.2", "8000", "tcp"}
+var CLIENT_SERVICE = connection {"10.0.0.2", "8005", "tcp"}
 //Will be used to keep track of servers that are servicing
 //make hashmap here when back from soccer
 var (
@@ -54,8 +56,67 @@ var (
 
 func main() {
 	go serverListener()
+	go httpListener()
 	//go serverHealthChecks()
 	clientListener()
+}
+
+func httpListener() {
+    fmt.Println("Hello World")
+    setupRoutes()
+    log.Fatal(http.ListenAndServe(":8000", nil))
+}
+
+func homePage(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Home Page")
+}
+
+// We'll need to define an Upgrader
+// this will require a Read and Write buffer size
+var upgrader = websocket.Upgrader{
+    ReadBufferSize:  1024,
+    WriteBufferSize: 1024,
+}
+
+func reader(conn *websocket.Conn) {
+    for {
+    // read in a message
+        messageType, p, err := conn.ReadMessage()
+        if err != nil {
+            log.Println(err)
+            return
+        }
+    // print out that message for clarity
+        fmt.Println(string(p))
+
+        if err := conn.WriteMessage(messageType, p); err != nil {
+            log.Println(err)
+            return
+        }
+    }
+}
+
+func wsEndpoint(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	// upgrade this connection to a WebSocket
+    // connection
+    ws, err := upgrader.Upgrade(w, r, nil)
+    if err != nil {
+        log.Println(err)
+    }
+    log.Println("Client Connected")
+
+    err = ws.WriteMessage(1, []byte("Hi Client!"))
+    if err != nil {
+        log.Println(err)
+    }
+	ws.
+	reader(ws)
+}
+
+func setupRoutes() {
+	http.HandleFunc("/", homePage)
+	http.HandleFunc("/ws", wsEndpoint)
 }
 
 /*func serverHealthChecks() {
@@ -138,7 +199,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 		clientResponseBuffer := make([]byte, 1024)
 		n, err := clientConn.Read(buffer)
 		if err != nil {
-			fmt.Println("Client has not sent an initial request. Connection will be terminated.")
+			fmt.Println("Failed to read a request from the client. Connection will be terminated.")
 			keepServicing = false
 			continue
 		}
@@ -158,7 +219,8 @@ func handleClientRequest(clientConn *net.TCPConn) {
 		serverMutex.Unlock()
 		var command []string = strings.Split(string(buffer[:n]), ":")
 		var request = string(buffer[:n])
-		if(len(command) != 1 && len(command) >= 2) {
+		//check if proxy received a valid request
+		if checkRequest(command) {
 			if strings.Compare(command[0], "Create Room") == 0 {
 				done := false
 				serverSelection := 0
@@ -272,78 +334,89 @@ func handleClientRequest(clientConn *net.TCPConn) {
 				}
 			} else if strings.Compare(command[0], "Join Room") == 0 {
 				//Client wants to Join a Room - First check if the
-				if(len(command) != 3) {
-					fmt.Printf("Join Room Command given %s by client %s, But must be formatted as : Join Room:Username:Access Code\n.", string(buffer[:n]), clientConn.RemoteAddr().String())
-					_, err = clientConn.Write([]byte("JOIN_ROOM_ILLEGAL_PROTOCOL"))
+				//First let's check if the room exists - Lock Critical Resource first
+				fmt.Printf("Join Room Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
+				gameRoomMutex.Lock()
+				serverMutex.Lock()
+				_, ok := gameRooms[command[2]]
+				//Room exists
+				if ok == true {
+					//we need to contact the game server, send the command
+					fmt.Printf("Requesting from Server with address %s a Join Room Request.\n", gameRooms[command[2]].gameRoomConn.RemoteAddr().String())
+					_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
 					if err != nil {
-						fmt.Printf("SEND JOIN_ROOM_ILLEGAL_PROTOCOL to client %s failed: %s\n", clientConn.RemoteAddr().String(), err.Error())
+						fmt.Printf("Sending Join Room Command %s to the server of game Room %s failed.\n", request, command[2])
+						//Must Handle
 					}
-					keepServicing = false;
-					clientConn.Close()
-				} else {
-					//Request has three tokens, let's handle.
-					//First let's check if the room exists - Lock Critical Resource first
-					fmt.Printf("Join Room Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
-					gameRoomMutex.Lock()
-					serverMutex.Lock()
-					_, ok := gameRooms[command[2]]
-					//Room exists
-					if ok == true {
-						//check if the player exists already, i.e., are we reconnecting?
-						player, playerOk := gameRooms[command[2]].players[command[1]]
-						if playerOk == true {
-							player.Close()
-							//no need to contact game server, just reset the connection
-							//Potential Error Point here -> if it doesn't work might need to replace with gameRooms[command[2]].players[command[1]]
-							//assign the new connection as the player's connection
-							player = clientConn
-							fmt.Printf("Player %s has successfully reconnected to game with access code %s.\n", command[1], command[2])
-							_, err = clientConn.Write([]byte("SUCCESSFUL_RECONNECTION"))
-							if err != nil {
-								fmt.Println("There was an error with sending SUCCESSFUL_RECONNECTION to the client:", err.Error())
-								keepServicing = false;
-							}
-						} else {
-							//we need to contact the game server, send the command
-							fmt.Printf("Requesting from Server with address %s a Join Room Request.\n", gameRooms[command[2]].gameRoomConn.RemoteAddr().String())
-							_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
-							if err != nil {
-								fmt.Printf("Sending Join Room Command %s to the server of game Room %s failed.\n", request, command[2])
-								//Must Handle
-							}
-							nServerResponse, err := gameRooms[command[2]].gameRoomConn.Read([]byte(serverResponseBuffer))
-							if err != nil {
-								fmt.Printf("Receiving Response from Server for Join Room Failed. SEND SERVER_RESPONSE_ERROR to client\n",)
-								_, err = clientConn.Write([]byte("SERVER_RESPONSE_ERROR"))
-								if err != nil {
-									fmt.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : \n", err.Error())
-								}
-							} else {
-								if strings.Compare(string(serverResponseBuffer[:nServerResponse]), "Join Success") == 0 {
-									//Successful Join, let's send response to client
-									fmt.Printf("Client %s with IP %s has successfully joined the Game Room %s.\n", command[1], clientConn.RemoteAddr().String(), command[2])
-									_, err = clientConn.Write([]byte(serverResponseBuffer[:nServerResponse]))
-									if err != nil {
-										fmt.Printf("There was an issue while sending Join Success acknowledgment to the client. \n")
-									}
-								} else {
-									//See what we can do later
-									//There was an error with the acknowledgment potentially. Corrupt information or byzantine failure?
-									fmt.Println("Join Success did not occur.")
-								}
-							}
+					nServerResponse, err := gameRooms[command[2]].gameRoomConn.Read([]byte(serverResponseBuffer))
+					if err != nil {
+						fmt.Printf("Receiving Response from Server for Join Room Failed. SEND SERVER_RESPONSE_ERROR to client\n",)
+						_, err = clientConn.Write([]byte("SERVER_RESPONSE_ERROR"))
+						if err != nil {
+							fmt.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : \n", err.Error())
+							//handle, client disconnected?
+						}
+					}
+					join_response := string(serverResponseBuffer[:nServerResponse])
+					if strings.Compare(join_response, "JOIN_SUCCESS") == 0 {
+						gameRooms[command[2]].players[command[1]] = clientConn
+						//Successful Join, let's send response to client
+						fmt.Printf("Client %s with IP %s has successfully joined the Game Room %s.\n", command[1], clientConn.RemoteAddr().String(), command[2])
+						_, err = clientConn.Write([]byte(serverResponseBuffer[:nServerResponse]))
+						if err != nil {
+							fmt.Printf("There was an issue while sending Join Success acknowledgment to the client. \n")
+							//probably just close connection?
+							//assume player disconnected?
+						}
+					} else if strings.Compare(join_response, "RECONNECT_SUCCESS") == 0 {
+						//need to do some testing. I think that if we kill the process the connection closes itself. Let's test
+						//if not we need to close old connection
+						//player, playerOk := gameRooms[command[2]].players[command[1]]
+						//no need to contact game server, just reset the connection
+						//Potential Error Point here -> if it doesn't work might need to replace with gameRooms[command[2]].players[command[1]]
+						//assign the new connection as the player's connection
+						gameRooms[command[2]].players[command[1]] = clientConn
+						fmt.Printf("Player %s has successfully reconnected to game with access code %s.\n", command[1], command[2])
+						_, err = clientConn.Write([]byte("RECONNECT_SUCCESS"))
+						if err != nil {
+							fmt.Println("There was an error with sending RECONNECT_SUCCESS to the client:", err.Error())
+							//handle error
+						}
+					} else if strings.Compare(join_response, "ROOM_FULL") == 0 {
+						fmt.Printf("Player %s is unable to join Room %s. The room is currently full. Send to client ROOM_FULL\n",)
+						_, err = clientConn.Write([]byte("ROOM_FULL"))
+						if err != nil {
+							fmt.Printf("ROOM_FULL message was not sent to the client. Error : \n", err.Error())
+							//handle error do we assume player disconnected?
 						}
 					} else {
-						//Room doesn't exist, send error
-						fmt.Printf("Room with access Code %s doesn't exists. JOIN_NON_EXISTENT_ROOM_ERROR was sent to the client.\n", command[2])
-						clientConn.Write([]byte("JOIN_NON_EXISTENT_ROOM_ERROR"))
+						fmt.Printf("Unexpected response from server for Join Room. Send to client JOIN_ROOM_SERVER_ERROR\n",)
+						_, err = clientConn.Write([]byte("JOIN_ROOM_SERVER_ERROR"))
+						if err != nil {
+							fmt.Printf("JOIN_ROOM_SERVER_ERROR was not sent to the client. Error : \n", err.Error())
+							//handle error do we assume player disconnected?
+						}
 					}
-					serverMutex.Unlock()
-					gameRoomMutex.Unlock()
+				} else {
+					//Room doesn't exist, send error, this will likely happen if data gets corrupt, highly unlikely
+					fmt.Printf("Room with access Code %s doesn't exists. JOIN_NON_EXISTENT_ROOM_ERROR was sent to the client.\n", command[2])
+					_, err = clientConn.Write([]byte("JOIN_NON_EXISTENT_ROOM_ERROR"))
+					if err != nil {
+						fmt.Printf("JOIN_NON_EXISTENT_ROOM_ERROR was not sent to the client. Error : \n", err.Error())
+						//handle error do we assume player disconnected?
+					}
 				}
+				serverMutex.Unlock()
+				gameRoomMutex.Unlock()
 			} else if strings.Compare(string(buffer[:n]), "Start Game") == 0 {
 				//Handle game start
-			} else {
+			} else if strings.Compare(command[0], "Ready") == 0 {
+				//Ready to start request from client
+				fmt.Printf("")
+				if len(command) == 3 {
+
+				}
+			}else {
 				fmt.Printf("Request %s has an in correct format. COMMUNICATION_PROTOCOL_ERROR will be sent to the client.\n")
 				_, err = clientConn.Write(([]byte("COMMUNICATION_PROTOCOL_ERROR")))
 				if err != nil {
@@ -409,4 +482,24 @@ func handleServerRegistration(conn net.Conn) {
 	}
 	// close conn
 	conn.Close()
+}
+
+func checkRequest(command []string) bool{
+	if(len(command) == 2 || len(command) == 3) {
+		if len(command) == 2 {
+			if strings.Compare(command[0], "Create Room") == 0 {
+				return true
+			} else {
+				return false
+			}
+		} else {
+			if strings.Compare(command[0], "Join Room") == 0 || strings.Compare(command[0], "Start Game") == 0 || strings.Compare(command[0], "Stop Game") == 0 {
+				return true
+			} else {
+				return false
+			}
+		}
+	} else {
+		return false
+	}
 }

@@ -152,60 +152,79 @@ func handleGameConnection(conn net.Conn) {
 			}
 		} else if strings.Compare(command[0], "Join Room") == 0 {
 			//Join Room:User Name:Access Code
-			//Check if a user wants to join a room. command[0] should contain the command and command[1] should contain the access code.
-			//command[2] should contain the username
-			if(len(command) == 3) {
-				//the command has 3 elements.
-				//First check the hasmap
-				gameRoomsMutex.Lock()
-				//The way we have structured the game room it must be the case that it exists
-				//Add player to the room
-				gameRooms[command[2]].players[command[1]] = 1
-				conn.Write([]byte("Join Success"))
+			//the command has 3 elements.
+			//First check the game hasmap for the player
+			gameRoomsMutex.Lock()
+			//The way we have structured the game room it must be the case that it exists
+			//Add player to the room
+			//check if the player is part of the room already
+			_, ok := gameRooms[command[2]].players[command[1]] 
+			if ok {
+				//player already in the room, must be reconnection request
+				conn.Write([]byte("RECONNECT_SUCCESS"))
 				if err != nil {
-					fmt.Printf("There was an error while sending Join Success to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+					fmt.Printf("There was an error while sending RECONNECT SUCCESS to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
 				} else {
-					fmt.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
+					fmt.Printf("Successfully reconnected user : %s to Game Room : %s\n", command[1], command[2])
 				}
-				gameRoomsMutex.Unlock()
-			} else if strings.Compare(command[0], "Start Game") == 0 {
-				//Requesting to start a game - has to be round 0
-				if gameRooms == nil {
-					//there are no rooms loaded check db
-					//run db script to get gameRoom with accessCode selected
-					gameRooms = make(map[string]gameRoom)
-					//add accessCode once read
+			} else {
+				//new player, check if room is full
+				if len(gameRooms[command[2]].players) < MAX_PLAYERS {
+					//player can join, there is room, assign it in memory
+					gameRooms[command[2]].players[command[1]] = 1
+					fmt.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
+					_, err = conn.Write([]byte("JOIN_SUCCESS"))
+					if err != nil {
+						fmt.Printf("There was an error while sending JOIN SUCCESS to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+						//This will be handled by proxy replication when the time comes, we should assume proxy is down.
+					}
 				} else {
-					//we don't care about the value so _ representes that, ok will be true if the accessCode exists
-					_, ok := gameRooms[command[1]]
-					if ok {
-						//return successfully joined
-						//generate questions for the game Room
-						if (generateQuestions(command[1])) {
-							//if successfully generated questions send
-							//question to the proxy, and proxy sends questions to clients
-						} else {
-							//there was an issue with generating questions
-							//send back ROOM_GENERATE_QUESTIONS_ERROR
-						}
+					_, err = conn.Write([]byte("ROOM_FULL"))
+					if err != nil {
+						fmt.Printf("There was an error while sending ROOM FULL to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
 					} else {
-						//accessCode doesn't exist in the map, access db and add to the hashmap if it's a real code
-						//if it's not real there is an error. Return ROOM_CODE_ERROR
+						fmt.Printf("Unable to add user to : %s to Game Room : %s. Room is full. ROOM FULL sent to proxy.\n", command[1], command[2])
 					}
 				}
-
-			} else if strings.Compare(command[0], "Stop Game") == 0 {
-				//added arbirtrarily so the compiler doesn't complain. More logic to be done.
-				//code is getting very long, hard to maintain. Might need to write functions for each
-				//command
-				// close conn
-				conn.Close()
-				break
-			} else {
-				fmt.Println("Invalid Option Given by the proxy.")
 			}
-			fmt.Printf("Awaiting the next request for Game Room:%s ....\n", accessCode)
+			gameRoomsMutex.Unlock()
+		} else if strings.Compare(command[0], "Start Game") == 0 {
+			//Requesting to start a game - has to be round 0
+			if gameRooms == nil {
+				//there are no rooms loaded check db
+				//run db script to get gameRoom with accessCode selected
+				gameRooms = make(map[string]gameRoom)
+				//add accessCode once read
+			} else {
+				//we don't care about the value so _ representes that, ok will be true if the accessCode exists
+				_, ok := gameRooms[command[1]]
+				if ok {
+					//return successfully joined
+					//generate questions for the game Room
+					if (generateQuestions(command[1])) {
+						//if successfully generated questions send
+						//question to the proxy, and proxy sends questions to clients
+					} else {
+						//there was an issue with generating questions
+						//send back ROOM_GENERATE_QUESTIONS_ERROR
+					}
+				} else {
+					//accessCode doesn't exist in the map, access db and add to the hashmap if it's a real code
+					//if it's not real there is an error. Return ROOM_CODE_ERROR
+				}
+			}
+
+		} else if strings.Compare(command[0], "Stop Game") == 0 {
+			//added arbirtrarily so the compiler doesn't complain. More logic to be done.
+			//code is getting very long, hard to maintain. Might need to write functions for each
+			//command
+			// close conn
+			conn.Close()
+			break
+		} else {
+			fmt.Println("Invalid Option Given by the proxy.")
 		}
+		fmt.Printf("Awaiting the next request for Game Room:%s ....\n", accessCode)
 	}
 }
 
