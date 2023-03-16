@@ -157,6 +157,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 		}
 		serverMutex.Unlock()
 		var command []string = strings.Split(string(buffer[:n]), ":")
+		var request = string(buffer[:n])
 		if(len(command) != 1 && len(command) >= 2) {
 			if strings.Compare(command[0], "Create Room") == 0 {
 				done := false
@@ -175,7 +176,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						fmt.Printf("ResolveTCPAddr failed for %s:%v\n", address, err.Error())
 						//Need to handle the case where we can't resolve the server.
 					}
-					fmt.Printf("User with username : %s & IP %s is asking for game Room Creation.\n", command[1], clientConn.RemoteAddr())
+					fmt.Printf("Create Room Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 					//attempt to connect to server to establish a game room connection using a tcp
 					gameRoomConn, err := net.DialTCP("tcp", nil, gameRoomAddr)
 					if err != nil {
@@ -184,24 +185,24 @@ func handleClientRequest(clientConn *net.TCPConn) {
 					}
 					//forward gameRoom creation request to server
 					fmt.Printf("Requesting from Server with address %s Game Room Creation.\n", gameRoomConn.RemoteAddr().String())
-					DeadWriteErr := gameRoomConn.SetWriteDeadline(time.Now().Add(300 * time.Millisecond))
+					/*DeadWriteErr := gameRoomConn.SetWriteDeadline(time.Now().Add(300 * time.Millisecond))
 					if DeadWriteErr != nil {
 						fmt.Println("Unable to set Write Deadline Error.", DeadWriteErr)
-					}
-					_, err = gameRoomConn.Write([]byte(buffer[:n]))
+					}*/
+					_, err = gameRoomConn.Write(buffer[:n])
 					if err != nil {
 						fmt.Printf("Sending the Game Room Creation Command : %s to the server failed: %s", string(buffer[:n]), err.Error())
 						//Handle
 					}
 					//wait for response
-					DeadReadErr := gameRoomConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+					/*DeadReadErr := gameRoomConn.SetReadDeadline(time.Now().Add(5 * time.Second))
 					if DeadReadErr != nil {
 						fmt.Println("Unable to set read deadline for the server acknowledgment.")
-					}
+					}*/
 					nResponse, err := gameRoomConn.Read([]byte(serverResponseBuffer))
 					if err != nil {
 						fmt.Println("Read data failed:", err.Error())
-						fmt.Printf("Failed to received a response from server : %s. Will attempt to connect to another server.\n", gameRoomConn.RemoteAddr().String())
+						fmt.Printf("Failed to receive a response from server : %s. Will attempt to connect to another server.\n", gameRoomConn.RemoteAddr().String())
 						//failed to read from server, let's try to connect to another server and retry
 						serverSelection++
 						//assume server is down kill connection, need more logic to redirect all game Rooms serviced by that server
@@ -211,7 +212,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 					}
 					var response []string = strings.Split(string(serverResponseBuffer[:nResponse]), ":")
 					if strings.Compare(response[0], "Room Created") == 0 {
-						fmt.Printf("Game Room successfully created. Access Code : %s and is served by : %s", response[1], gameRoomConn.RemoteAddr().String())
+						fmt.Printf("Game Room successfully created. Access Code : %s and is served by : %s\n", response[1], gameRoomConn.RemoteAddr().String())
 						//add the game room to the gameRoom list tracked by the proxy
 						//need to make sure there is no deadlock here - test with multiple game room creation requests at the same time.
 						gameRoomMutex.Lock()
@@ -221,11 +222,11 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						//assign the player with username command[1] to the gameRoom (He is the creator of the game Room)
 						//so we should add him to the game Room since he was successful
 						gameRooms[response[1]].players[command[1]] = clientConn
-						keepErr := gameRoomConn.SetKeepAlive(true)
+						/*keepErr := gameRoomConn.SetKeepAlive(true)
 						if keepErr != nil {
 							fmt.Printf("Unable to set keepalive - %s", err)	
-						}
-						gameRoomConn.SetKeepAlivePeriod(1 * time.Second)
+						}*/
+						//gameRoomConn.SetKeepAlivePeriod(1 * time.Second)
 						totalGamesServing[0]++
 						serverMutex.Unlock()
 						gameRoomMutex.Unlock()
@@ -241,12 +242,12 @@ func handleClientRequest(clientConn *net.TCPConn) {
 							fmt.Printf("Write Access Code:%s to client %s failed: %s\n", response[1], clientConn.RemoteAddr().String(), err.Error())
 							//Handle
 						}
-						n, err = clientConn.Read([]byte(clientResponseBuffer))
+						nClientResponse, err := clientConn.Read([]byte(clientResponseBuffer))
 						if err != nil {
 							fmt.Printf("Reading Acknowledgement for Access Code Receive from Client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
 							//Handle
 						}
-						if strings.Compare(string(clientResponseBuffer[:n]), "Access Code Received.") == 0 {
+						if strings.Compare(string(clientResponseBuffer[:nClientResponse]), "Access Code Received") == 0 {
 							//Acknowledgement received
 							fmt.Printf("Client with username %s & IP address %s received the Access Code.\n", command[1], clientConn.RemoteAddr().String())
 						} else{
@@ -269,7 +270,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						fmt.Printf("Server Response for Command : %s was %s.\n", string(buffer[:n]), string(serverResponseBuffer[:nResponse]))
 					}
 				}
-			} else if strings.Compare(string(buffer[:n]), "Join Room") == 0 {
+			} else if strings.Compare(command[0], "Join Room") == 0 {
 				//Client wants to Join a Room - First check if the
 				if(len(command) != 3) {
 					fmt.Printf("Join Room Command given %s by client %s, But must be formatted as : Join Room:Username:Access Code\n.", string(buffer[:n]), clientConn.RemoteAddr().String())
@@ -282,6 +283,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 				} else {
 					//Request has three tokens, let's handle.
 					//First let's check if the room exists - Lock Critical Resource first
+					fmt.Printf("Join Room Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 					gameRoomMutex.Lock()
 					serverMutex.Lock()
 					_, ok := gameRooms[command[2]]
@@ -296,19 +298,30 @@ func handleClientRequest(clientConn *net.TCPConn) {
 							//assign the new connection as the player's connection
 							player = clientConn
 							fmt.Printf("Player %s has successfully reconnected to game with access code %s.\n", command[1], command[2])
-							clientConn.Write([]byte("SUCCESSFUL_RECONNECTION"))
+							_, err = clientConn.Write([]byte("SUCCESSFUL_RECONNECTION"))
+							if err != nil {
+								fmt.Println("There was an error with sending SUCCESSFUL_RECONNECTION to the client:", err.Error())
+								keepServicing = false;
+							}
 						} else {
 							//we need to contact the game server, send the command
+							fmt.Printf("Requesting from Server with address %s a Join Room Request.\n", gameRooms[command[2]].gameRoomConn.RemoteAddr().String())
 							_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
 							if err != nil {
-								fmt.Printf("Sending Join Room Command %s to the server of game Room %s failed.\n", string(buffer[:n]), command[2])
+								fmt.Printf("Sending Join Room Command %s to the server of game Room %s failed.\n", request, command[2])
+								//Must Handle
 							}
-							nServerResponse, err := gameRooms[command[2]].gameRoomConn.Write([]byte(serverResponseBuffer))
+							nServerResponse, err := gameRooms[command[2]].gameRoomConn.Read([]byte(serverResponseBuffer))
 							if err != nil {
-								fmt.Printf("Receiving Response from Server for Join Room Failed. SEND SERVER_RESPONSE_ERROR\n",)
+								fmt.Printf("Receiving Response from Server for Join Room Failed. SEND SERVER_RESPONSE_ERROR to client\n",)
+								_, err = clientConn.Write([]byte("SERVER_RESPONSE_ERROR"))
+								if err != nil {
+									fmt.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : \n", err.Error())
+								}
 							} else {
 								if strings.Compare(string(serverResponseBuffer[:nServerResponse]), "Join Success") == 0 {
 									//Successful Join, let's send response to client
+									fmt.Printf("Client %s with IP %s has successfully joined the Game Room %s.\n", command[1], clientConn.RemoteAddr().String(), command[2])
 									_, err = clientConn.Write([]byte(serverResponseBuffer[:nServerResponse]))
 									if err != nil {
 										fmt.Printf("There was an issue while sending Join Success acknowledgment to the client. \n")
@@ -330,6 +343,13 @@ func handleClientRequest(clientConn *net.TCPConn) {
 				}
 			} else if strings.Compare(string(buffer[:n]), "Start Game") == 0 {
 				//Handle game start
+			} else {
+				fmt.Printf("Request %s has an in correct format. COMMUNICATION_PROTOCOL_ERROR will be sent to the client.\n")
+				_, err = clientConn.Write(([]byte("COMMUNICATION_PROTOCOL_ERROR")))
+				if err != nil {
+					fmt.Println("Sending COMMUNICATION_PROTOCOL_ERROR to client failed:", err.Error())
+					keepServicing = false;
+				}
 			}
 		} else {
 			//Cannot Service request, authentication information missing

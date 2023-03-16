@@ -12,7 +12,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strings"
@@ -26,12 +25,12 @@ type connection struct {
 }
 
 type gameRoom struct {
-	accessCode string
+	players map[string] int
 }
 
 var (
 	gameRoomsMutex sync.Mutex
-	gameRooms map[string] int
+	gameRooms map[string] gameRoom
 )
 
 var MAX_PLAYERS int = 4
@@ -96,17 +95,21 @@ func handleGameConnection(conn net.Conn) {
 	//each game Room Connection should be handled till the game is over
 	//might wanna check and see if the game request is in proper format / incase of data corruption.
 	//send message
+	var accessCode string
 	for {
 		//We can block here the request is handled with maybe a go routine. Let's think about it
 		//Depends if we want to hold state on the server by closing connections and initiating connections
 		//or just maintaining a pipeline of communication. (Go routines inside the go routine)
-		buffer := make([]byte, 1024)
-		n, err := conn.Read(buffer)
+		requestBuffer := make([]byte, 1024)
+		responseBuffer := make([]byte, 1024)
+		nRequest, err := conn.Read(requestBuffer)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Printf("There was an error while reading from the proxy the next command for the game Room.\n")
 		}
 		//we should make sure the Protocol is enforced. There is some if statements missing here in each option
-		var command []string = strings.Split(string(buffer[:n]), ":")
+		var command []string = strings.Split(string(requestBuffer[:nRequest]), ":")
+		var request = string(requestBuffer[:nRequest])
+		fmt.Printf("Client Request: %s\n", request)
 		//If message received is create room, send game Room Access Code
 		if strings.Compare(command[0], "Create Room") == 0 {
 			//Create Room:username is the communication format
@@ -115,61 +118,54 @@ func handleGameConnection(conn net.Conn) {
 			//Call function that generates access code
 			//add user to game room in database (command[1] stored in db)
 			//Wait for Acknowledgement
-			var accessCode  string = generateAccessCode()
+			accessCode = generateAccessCode()
 			//time.Sleep(8 * time.Second)
 			conn.Write([]byte("Room Created:"+accessCode))
 			if err != nil {
-				fmt.Println("Write data failed:", err.Error())
-				os.Exit(1)
+				fmt.Printf("Failed to send the game Room access Code to the proxy. %s\n", err.Error())
 			}
 			fmt.Printf("Game Room Access Code : %s was sent to the Proxy.\n", accessCode)
 			//Wait for acknowledgement
-			n, err = conn.Read(buffer)
+			nResponse, err := conn.Read(responseBuffer)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Printf("There was an error while receiving the Game Room Creation Acknowledgment from the proxy.\n")
 			}
-			if strings.Compare(string(buffer[:n]), "Access Code Received") == 0 {
+			if strings.Compare(string(responseBuffer[:nResponse]), "Access Code Received") == 0 {
 				//Room should be activated now
 				gameRoomsMutex.Lock()
 				if gameRooms == nil {
 					//map is unitiliazed
-					gameRooms = make(map[string]int)
+					gameRooms = make(map[string]gameRoom)
 				}
-				//add game room to the game rooms slice that the server tracks
-				gameRooms[accessCode] = 1
+				//add game room to the Game Rooms map
+				gameRooms[accessCode] = gameRoom{players:make(map[string]int)}
+				//Add player to the hash
+				gameRooms[accessCode].players[command[1]] = 1
+				gameRoomsMutex.Unlock()
+				fmt.Printf("Player with username %s has been added to the Game Room with access Code : %s\n", command[1], accessCode)
 				fmt.Printf("Access Code : %s for the game Room was Received by the Proxy.\n", accessCode)
 				//Now we are ready to add access code to the valid game rooms
 				fmt.Printf("Game room with Access Code : %s is active. Listening for requests....\n", accessCode)
 			} else {
-				//Corrupt message from the proxy??
-				fmt.Printf("Proxy replied with %s\n", string(buffer[:n]))
-				// close conn
+				//Corrupt message from the proxy?? See if we need to handle this
+				fmt.Printf("Proxy replied with %s\n", string(responseBuffer[:nResponse]))
 			}
-			//potential error handling here - think
 		} else if strings.Compare(command[0], "Join Room") == 0 {
+			//Join Room:User Name:Access Code
 			//Check if a user wants to join a room. command[0] should contain the command and command[1] should contain the access code.
 			//command[2] should contain the username
-			if(len(command) == 2) {
-				//the command has 2 elements, let's check if the second element is a valid game room code.
+			if(len(command) == 3) {
+				//the command has 3 elements.
 				//First check the hasmap
 				gameRoomsMutex.Lock()
-				if gameRooms == nil {
-					//there are no rooms loaded check db
-					//run db script to get gameRoom with accessCode selected
-					gameRooms = make(map[string]int)
-					//add accessCode once read
+				//The way we have structured the game room it must be the case that it exists
+				//Add player to the room
+				gameRooms[command[2]].players[command[1]] = 1
+				conn.Write([]byte("Join Success"))
+				if err != nil {
+					fmt.Printf("There was an error while sending Join Success to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
 				} else {
-					//we don't care about the value so _ representes that, ok will be true if the accessCode exists
-					_, ok := gameRooms[command[1]]
-					if ok {
-						//return successfully joined
-						//add user to the room in the db, command[2] should be the username.
-						//client side should make sure username is valid before sending
-						//return JOIN_SUCCESS
-					} else {
-						//accessCode doesn't exist in the map, access db and add to the hashmap if it's a real code
-						//if it's not real there is an error. Return ROOM_CODE_ERROR
-					}
+					fmt.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
 				}
 				gameRoomsMutex.Unlock()
 			} else if strings.Compare(command[0], "Start Game") == 0 {
@@ -177,7 +173,7 @@ func handleGameConnection(conn net.Conn) {
 				if gameRooms == nil {
 					//there are no rooms loaded check db
 					//run db script to get gameRoom with accessCode selected
-					gameRooms = make(map[string]int)
+					gameRooms = make(map[string]gameRoom)
 					//add accessCode once read
 				} else {
 					//we don't care about the value so _ representes that, ok will be true if the accessCode exists
@@ -205,8 +201,10 @@ func handleGameConnection(conn net.Conn) {
 				// close conn
 				conn.Close()
 				break
+			} else {
+				fmt.Println("Invalid Option Given by the proxy.")
 			}
-			fmt.Println("Invalid Option Given by the proxy.")
+			fmt.Printf("Awaiting the next request for Game Room:%s ....\n", accessCode)
 		}
 	}
 }
