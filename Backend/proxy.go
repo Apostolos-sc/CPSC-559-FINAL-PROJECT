@@ -12,24 +12,26 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
-	"net/http"
+
 	"github.com/gorilla/websocket"
 )
 
 //Connection information
 type connection struct {
-	host string;
-	port string;
-	con_type string;
+	host     string
+	port     string
+	con_type string
 }
+
 //gameRoom with an access Code and a server that will serve
 type gameRoom struct {
 	gameRoomConn *net.TCPConn
-	players map[string]*net.TCPConn
+	players      map[string]*websocket.Conn
 }
 
 //global ticker for tracking time intervals
@@ -37,87 +39,87 @@ type gameRoom struct {
 
 //Maximum number of game rooms a server should handle
 var MAX_ROOMS_PER_SERVER int = 2
+
 //Address to be listening for servers to indicate they want to serve
-var SERVER_REGISTRATION = connection {"10.0.0.2", "9000", "tcp"}
+var SERVER_REGISTRATION = connection{"10.0.0.2", "9000", "tcp"}
+
 //Address to be listening for clients
-var CLIENT_SERVICE = connection {"10.0.0.2", "8005", "tcp"}
+var CLIENT_SERVICE = connection{"10.0.0.2", "8000", "tcp"}
+
 //Will be used to keep track of servers that are servicing
 //make hashmap here when back from soccer
 var (
-	serverMutex sync.Mutex
-	serversSlice[] connection
-	totalGamesServing[] int
+	serverMutex       sync.Mutex
+	serversSlice      []connection
+	totalGamesServing []int
 )
+
 //Will be used to keep track of the gameRooms being serviced
 var (
 	gameRoomMutex sync.Mutex
-	gameRooms = make(map[string] gameRoom)
+	gameRooms     = make(map[string]gameRoom)
 )
 
 func main() {
 	go serverListener()
-	go httpListener()
 	//go serverHealthChecks()
 	clientListener()
 }
 
-func httpListener() {
-    fmt.Println("Hello World")
-    setupRoutes()
-    log.Fatal(http.ListenAndServe(":8000", nil))
-}
-
+/* Keep for reference
 func homePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Home Page")
 }
+*/
 
 // We'll need to define an Upgrader
 // this will require a Read and Write buffer size
 var upgrader = websocket.Upgrader{
-    ReadBufferSize:  1024,
-    WriteBufferSize: 1024,
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
 }
 
 func reader(conn *websocket.Conn) {
-    for {
-    // read in a message
-        messageType, p, err := conn.ReadMessage()
-        if err != nil {
-            log.Println(err)
-            return
-        }
-    // print out that message for clarity
-        fmt.Println(string(p))
+	for {
+		// read in a message
+		messageType, p, err := conn.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		// print out that message for clarity
+		fmt.Println(string(p))
 
-        if err := conn.WriteMessage(messageType, p); err != nil {
-            log.Println(err)
-            return
-        }
-    }
+		if err := conn.WriteMessage(messageType, p); err != nil {
+			log.Println(err)
+			return
+		}
+	}
 }
 
 func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	// upgrade this connection to a WebSocket
-    // connection
-    ws, err := upgrader.Upgrade(w, r, nil)
-    if err != nil {
-        log.Println(err)
-    }
-    log.Println("Client Connected")
-
-    err = ws.WriteMessage(1, []byte("Hi Client!"))
-    if err != nil {
-        log.Println(err)
-    }
-	ws.
-	reader(ws)
+	// connection
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Printf("There was an error when attempting to upgrade connection to a web socket. Error : %s\n", err.Error())
+	}
+	//log.Println("Client Connected")
+	/*
+		err = ws.WriteMessage(1, []byte("Hi Client!"))
+		if err != nil {
+			log.Println(err)
+		}
+	*/
+	handleClientRequest(ws)
 }
 
+/*
 func setupRoutes() {
 	http.HandleFunc("/", homePage)
-	http.HandleFunc("/ws", wsEndpoint)
-}
+
+}*/
 
 /*func serverHealthChecks() {
 	go func() {
@@ -130,35 +132,50 @@ func setupRoutes() {
 }*/
 func clientListener() {
 	//Client needs to provide which game room ID it is going be to connecting to.
-	clientServiceTCPAddr, err := net.ResolveTCPAddr(CLIENT_SERVICE.con_type, CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port)
+	//websocket handler - no error handling needed here
+	http.HandleFunc("/ws", wsEndpoint)
+	//http listener
+	err := http.ListenAndServe(CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port, nil)
 	if err != nil {
-		fmt.Printf("Unable to resolve IP")
-	}
-
-	// Start TCP Listener
-	listener, err := net.ListenTCP("tcp", clientServiceTCPAddr)
-	if err != nil {
-		fmt.Printf("Unable to start listener - %s", err)
+		fmt.Printf("Unable to Listen and Serve HTTP Requests on %s:%s. Error : %s.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port, err.Error())
+		//Need to handle error. Potential kill process.
 	} else {
 		fmt.Printf("Listening on %v:%v for client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
 	}
+	//Don't need the TCP stuff, everything is now handled through Websocket Protocol
+	/*
+		clientServiceTCPAddr, err := net.ResolveTCPAddr(CLIENT_SERVICE.con_type, CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port)
+		if err != nil {
+			fmt.Printf("Unable to resolve IP")
+		}
+
+		// Start TCP Listener
+		listener, err := net.ListenTCP("tcp", clientServiceTCPAddr)
+		if err != nil {
+			fmt.Printf("Unable to start listener - %s", err)
+		} else {
+			fmt.Printf("Listening on %v:%v for client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
+		}
+	*/
 	//close Listener
-	defer listener.Close()
+	//defer listener.Close()
 
 	//Continuously Listen for Client Connections
-	for {
-		//Serve Clients
-		conn, err:= listener.AcceptTCP()
-		if err != nil {
-			log.Fatal(err)
-			os.Exit(1)
+	/*
+		for {
+			//Serve Clients
+			conn, err := listener.AcceptTCP()
+			if err != nil {
+				log.Fatal(err)
+				os.Exit(1)
+			}
+			fmt.Printf("Incoming Potential Client Service Request from : %s\n", conn.RemoteAddr().String())
+			go handleClientRequest(conn)
 		}
-		fmt.Printf("Incoming Potential Client Service Request from : %s\n", conn.RemoteAddr().String())
-		go handleClientRequest(conn)
-	}
+	*/
 }
 
-func serverListener () {
+func serverListener() {
 	// Resolve TCP Address
 	//Address to be listening on
 	serverRegistrationTCPAddr, err := net.ResolveTCPAddr(SERVER_REGISTRATION.con_type, SERVER_REGISTRATION.host+":"+SERVER_REGISTRATION.port)
@@ -178,7 +195,7 @@ func serverListener () {
 
 	//Continuously Listen for connections
 	for {
-		conn, err:= listener.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			log.Fatal(err)
 			fmt.Println("Server Listener Accept functionality error occurred:", err.Error())
@@ -188,28 +205,30 @@ func serverListener () {
 		go handleServerRegistration(conn)
 	}
 }
+
 //handle Client Request. If Game Room pipeline is created maybe we need to set a timeout before
 //a game room is utilized or just time out the room?
-func handleClientRequest(clientConn *net.TCPConn) {
+func handleClientRequest(clientConn *websocket.Conn) {
 	var keepServicing bool = true
 	for keepServicing {
 		//Handle Client Request Here
 		buffer := make([]byte, 1024)
 		serverResponseBuffer := make([]byte, 1024)
 		clientResponseBuffer := make([]byte, 1024)
-		n, err := clientConn.Read(buffer)
+		_, buffer, err := clientConn.ReadMessage()
 		if err != nil {
 			fmt.Println("Failed to read a request from the client. Connection will be terminated.")
 			keepServicing = false
 			continue
 		}
+		n := len(buffer)
 		//critical access
 		serverMutex.Lock()
-		if(len(serversSlice) == 0) {
+		if len(serversSlice) == 0 {
 			serverMutex.Unlock()
 			//Can't service Client, no live Servers.
 			fmt.Println("There are no servers available to service Clients. Send Error to Client. Connection Terminated.")
-			_, err = clientConn.Write(([]byte("SERVER_AVAILABILITY_ERROR")))
+			err = clientConn.WriteMessage(1, ([]byte("SERVER_AVAILABILITY_ERROR")))
 			if err != nil {
 				fmt.Println("Unable to send to client SERVER_AVAILABILITY_ERROR:", err.Error())
 			}
@@ -232,7 +251,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 					//Critical Section
 					gameRoomMutex.Lock()
 					gameRoomAddr, err := net.ResolveTCPAddr("tcp", serversSlice[serverSelection].host+":"+serversSlice[serverSelection].port)
-					address := string(serversSlice[serverSelection].host+":"+serversSlice[serverSelection].port)
+					address := string(serversSlice[serverSelection].host + ":" + serversSlice[serverSelection].port)
 					gameRoomMutex.Unlock()
 					if err != nil {
 						fmt.Printf("ResolveTCPAddr failed for %s:%v\n", address, err.Error())
@@ -272,6 +291,30 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						gameRoomConn.Close()
 						continue
 					}
+					/*
+						// The message types are defined in RFC 6455, section 11.8.
+						const (
+							// TextMessage denotes a text data message. The text message payload is
+							// interpreted as UTF-8 encoded text data.
+							TextMessage = 1
+
+							// BinaryMessage denotes a binary data message.
+							BinaryMessage = 2
+
+							// CloseMessage denotes a close control message. The optional message
+							// payload contains a numeric code and text. Use the FormatCloseMessage
+							// function to format a close message payload.
+							CloseMessage = 8
+
+							// PingMessage denotes a ping control message. The optional message payload
+							// is UTF-8 encoded text.
+							PingMessage = 9
+
+							// PongMessage denotes a pong control message. The optional message payload
+							// is UTF-8 encoded text.
+							PongMessage = 10
+						)
+					*/
 					var response []string = strings.Split(string(serverResponseBuffer[:nResponse]), ":")
 					if strings.Compare(response[0], "Room Created") == 0 {
 						fmt.Printf("Game Room successfully created. Access Code : %s and is served by : %s\n", response[1], gameRoomConn.RemoteAddr().String())
@@ -280,13 +323,13 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						gameRoomMutex.Lock()
 						serverMutex.Lock()
 						//Initialize game Room Struct and initialize its map of players
-						gameRooms[response[1]] = gameRoom{gameRoomConn, make(map[string]*net.TCPConn)}
+						gameRooms[response[1]] = gameRoom{gameRoomConn, make(map[string]*websocket.Conn)}
 						//assign the player with username command[1] to the gameRoom (He is the creator of the game Room)
 						//so we should add him to the game Room since he was successful
 						gameRooms[response[1]].players[command[1]] = clientConn
 						/*keepErr := gameRoomConn.SetKeepAlive(true)
 						if keepErr != nil {
-							fmt.Printf("Unable to set keepalive - %s", err)	
+							fmt.Printf("Unable to set keepalive - %s", err)
 						}*/
 						//gameRoomConn.SetKeepAlivePeriod(1 * time.Second)
 						totalGamesServing[0]++
@@ -299,20 +342,27 @@ func handleClientRequest(clientConn *net.TCPConn) {
 							//handle error
 						}
 						//Send to client success message.
-						_, err = clientConn.Write([]byte("Access Code:"+response[1]))
+						err = clientConn.WriteMessage(1, []byte("Access Code:"+response[1]))
 						if err != nil {
 							fmt.Printf("Write Access Code:%s to client %s failed: %s\n", response[1], clientConn.RemoteAddr().String(), err.Error())
 							//Handle
 						}
-						nClientResponse, err := clientConn.Read([]byte(clientResponseBuffer))
+						/*
+							nClientResponse, err := clientConn.Read([]byte(clientResponseBuffer))
+							if err != nil {
+								fmt.Printf("Reading Acknowledgement for Access Code Receive from Client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
+								//Handle
+							} */
+						_, clientResponseBuffer, err = clientConn.ReadMessage()
 						if err != nil {
 							fmt.Printf("Reading Acknowledgement for Access Code Receive from Client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
 							//Handle
 						}
+						nClientResponse := len(clientResponseBuffer)
 						if strings.Compare(string(clientResponseBuffer[:nClientResponse]), "Access Code Received") == 0 {
 							//Acknowledgement received
 							fmt.Printf("Client with username %s & IP address %s received the Access Code.\n", command[1], clientConn.RemoteAddr().String())
-						} else{
+						} else {
 							//neeeded? in case of corrupt message?
 							fmt.Printf("Client send Access Code Acknowledgment Errorneous Message : %s", string(clientResponseBuffer[:n]))
 							//Corrupt message or no acknowledgement? check. -> timeout implementation
@@ -322,9 +372,9 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						//Error with room creation -> potentially sent when db can't be reached? dunno we will see. Maybe not needed. This could violate
 						//consistency if db can't be accessed and server crashes before changes are stored. So maybe server sends error if no DB can
 						//be accessed
-						_, err = clientConn.Write([]byte("ROOM_CREATION_ERROR"))
+						err = clientConn.WriteMessage(1, []byte("ROOM_CREATION_ERROR"))
 						if err != nil {
-							fmt.Printf("Unable to write to client %s: %s\n", clientConn.RemoteAddr().String(),err.Error())
+							fmt.Printf("Unable to write to client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
 							//Handle
 						}
 					} else {
@@ -350,8 +400,8 @@ func handleClientRequest(clientConn *net.TCPConn) {
 					}
 					nServerResponse, err := gameRooms[command[2]].gameRoomConn.Read([]byte(serverResponseBuffer))
 					if err != nil {
-						fmt.Printf("Receiving Response from Server for Join Room Failed. SEND SERVER_RESPONSE_ERROR to client\n",)
-						_, err = clientConn.Write([]byte("SERVER_RESPONSE_ERROR"))
+						fmt.Printf("Receiving Response from Server for Join Room Failed. SEND SERVER_RESPONSE_ERROR to client\n")
+						err = clientConn.WriteMessage(1, []byte("SERVER_RESPONSE_ERROR"))
 						if err != nil {
 							fmt.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : \n", err.Error())
 							//handle, client disconnected?
@@ -362,7 +412,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						gameRooms[command[2]].players[command[1]] = clientConn
 						//Successful Join, let's send response to client
 						fmt.Printf("Client %s with IP %s has successfully joined the Game Room %s.\n", command[1], clientConn.RemoteAddr().String(), command[2])
-						_, err = clientConn.Write([]byte(serverResponseBuffer[:nServerResponse]))
+						err = clientConn.WriteMessage(1, []byte(serverResponseBuffer[:nServerResponse]))
 						if err != nil {
 							fmt.Printf("There was an issue while sending Join Success acknowledgment to the client. \n")
 							//probably just close connection?
@@ -377,21 +427,21 @@ func handleClientRequest(clientConn *net.TCPConn) {
 						//assign the new connection as the player's connection
 						gameRooms[command[2]].players[command[1]] = clientConn
 						fmt.Printf("Player %s has successfully reconnected to game with access code %s.\n", command[1], command[2])
-						_, err = clientConn.Write([]byte("RECONNECT_SUCCESS"))
+						err = clientConn.WriteMessage(1, []byte("RECONNECT_SUCCESS"))
 						if err != nil {
 							fmt.Println("There was an error with sending RECONNECT_SUCCESS to the client:", err.Error())
 							//handle error
 						}
 					} else if strings.Compare(join_response, "ROOM_FULL") == 0 {
-						fmt.Printf("Player %s is unable to join Room %s. The room is currently full. Send to client ROOM_FULL\n",)
-						_, err = clientConn.Write([]byte("ROOM_FULL"))
+						fmt.Printf("Player %s is unable to join Room %s. The room is currently full. Send to client ROOM_FULL\n")
+						err = clientConn.WriteMessage(1, []byte("ROOM_FULL"))
 						if err != nil {
 							fmt.Printf("ROOM_FULL message was not sent to the client. Error : \n", err.Error())
 							//handle error do we assume player disconnected?
 						}
 					} else {
-						fmt.Printf("Unexpected response from server for Join Room. Send to client JOIN_ROOM_SERVER_ERROR\n",)
-						_, err = clientConn.Write([]byte("JOIN_ROOM_SERVER_ERROR"))
+						fmt.Printf("Unexpected response from server for Join Room. Send to client JOIN_ROOM_SERVER_ERROR\n")
+						err = clientConn.WriteMessage(1, []byte("JOIN_ROOM_SERVER_ERROR"))
 						if err != nil {
 							fmt.Printf("JOIN_ROOM_SERVER_ERROR was not sent to the client. Error : \n", err.Error())
 							//handle error do we assume player disconnected?
@@ -400,7 +450,7 @@ func handleClientRequest(clientConn *net.TCPConn) {
 				} else {
 					//Room doesn't exist, send error, this will likely happen if data gets corrupt, highly unlikely
 					fmt.Printf("Room with access Code %s doesn't exists. JOIN_NON_EXISTENT_ROOM_ERROR was sent to the client.\n", command[2])
-					_, err = clientConn.Write([]byte("JOIN_NON_EXISTENT_ROOM_ERROR"))
+					err = clientConn.WriteMessage(1, []byte("JOIN_NON_EXISTENT_ROOM_ERROR"))
 					if err != nil {
 						fmt.Printf("JOIN_NON_EXISTENT_ROOM_ERROR was not sent to the client. Error : \n", err.Error())
 						//handle error do we assume player disconnected?
@@ -416,21 +466,21 @@ func handleClientRequest(clientConn *net.TCPConn) {
 				if len(command) == 3 {
 
 				}
-			}else {
+			} else {
 				fmt.Printf("Request %s has an in correct format. COMMUNICATION_PROTOCOL_ERROR will be sent to the client.\n")
-				_, err = clientConn.Write(([]byte("COMMUNICATION_PROTOCOL_ERROR")))
+				err = clientConn.WriteMessage(1, []byte("COMMUNICATION_PROTOCOL_ERROR"))
 				if err != nil {
 					fmt.Println("Sending COMMUNICATION_PROTOCOL_ERROR to client failed:", err.Error())
-					keepServicing = false;
+					keepServicing = false
 				}
 			}
 		} else {
 			//Cannot Service request, authentication information missing
 			fmt.Printf("Communications Protocol Violated. Error will be sent to client, and connection terminated.\n")
-			_, err = clientConn.Write(([]byte("COMMUNICATION_PROTOCOL_ERROR")))
+			err = clientConn.WriteMessage(1, ([]byte("COMMUNICATION_PROTOCOL_ERROR")))
 			if err != nil {
 				fmt.Println("Sending COMMUNICATION_PROTOCOL_ERROR to client failed:", err.Error())
-				keepServicing = false;
+				keepServicing = false
 			}
 		}
 	}
@@ -460,7 +510,7 @@ func handleServerRegistration(conn net.Conn) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		//assume that the address that the server will be will listening for 
+		//assume that the address that the server will be will listening for
 		//game room service requests
 		host, port, err = net.SplitHostPort(string(buffer[:n]))
 		if err != nil {
@@ -469,7 +519,7 @@ func handleServerRegistration(conn net.Conn) {
 			fmt.Printf("")
 			serverMutex.Lock()
 			//Add server data on the server slice
-			serversSlice = append(serversSlice, connection{host:host, port:port, con_type:"tcp"})
+			serversSlice = append(serversSlice, connection{host: host, port: port, con_type: "tcp"})
 			//set total number of games serving to zero
 			totalGamesServing = append(totalGamesServing, 0)
 			serverMutex.Unlock()
@@ -484,8 +534,8 @@ func handleServerRegistration(conn net.Conn) {
 	conn.Close()
 }
 
-func checkRequest(command []string) bool{
-	if(len(command) == 2 || len(command) == 3) {
+func checkRequest(command []string) bool {
+	if len(command) == 2 || len(command) == 3 {
 		if len(command) == 2 {
 			if strings.Compare(command[0], "Create Room") == 0 {
 				return true
