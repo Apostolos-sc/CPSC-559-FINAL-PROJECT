@@ -1,8 +1,6 @@
 #!/bin/bash
 
 docker-compose down -v
-echo "password" | sudo -S rm -rf ./master/data/*
-echo "password" | sudo -S rm -rf ./slave/data/*
 docker-compose build
 docker-compose up -d
 

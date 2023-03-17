@@ -1,34 +1,53 @@
 version: '3'
 services:
-  mysql_master:
-    image: mysql:8.0
+  db1:
+    image: database_server
+    build: database_server
     env_file:
-      - ./master/mysql_master.env
-    container_name: "mysql_master"
+      - ./database_server/.env
+    environment:
+      ID: 1
+      REPLICA_ID: 2
+    container_name: "database_server_1"
     restart: "no"
     ports:
       - 4406:3306
     volumes:
-      - ./master/conf/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
-      - ./master/data:/var/lib/mysql
+      - ./database_server/db1/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
       - ./history.txt:/history.txt
       - ./db.py:/db.py
     networks:
       - overlay
 
-  mysql_slave:
-    image: mysql:8.0
+  db2:
+    image: database_server
+    build: database_server
     env_file:
-      - ./slave/mysql_slave.env
-    container_name: "mysql_slave"
+      - ./database_server/.env
+    environment:
+      ID: 2
+      REPLICA_ID: 1
+    container_name: "database_server_2"
     restart: "no"
+    depends_on:
+      - db1
     ports:
       - 5506:3306
-    depends_on:
-      - mysql_master
     volumes:
-      - ./slave/conf/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
-      - ./slave/data:/var/lib/mysql
+      - ./database_server/db2/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./history.txt:/history.txt
+      - ./db.py:/db.py
+    networks:
+      - overlay
+
+  mysql_monitor:
+    image: database_monitor
+    container_name: "database_monitor"
+    build: database_monitor
+    restart: "no"
+    depends_on:
+      - db1
+      - db2
     networks:
       - overlay
 
