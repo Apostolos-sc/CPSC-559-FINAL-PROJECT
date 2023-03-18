@@ -17,7 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -135,13 +134,13 @@ func clientListener() {
 	//websocket handler - no error handling needed here
 	http.HandleFunc("/ws", wsEndpoint)
 	//http listener
+	fmt.Printf("Listening on %v:%v for Client Requests\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
 	err := http.ListenAndServe(CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port, nil)
 	if err != nil {
 		fmt.Printf("Unable to Listen and Serve HTTP Requests on %s:%s. Error : %s.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port, err.Error())
 		//Need to handle error. Potential kill process.
-	} else {
-		fmt.Printf("Listening on %v:%v for client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
 	}
+	fmt.Printf("Listening on %v:%v for client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
 	//Don't need the TCP stuff, everything is now handled through Websocket Protocol
 	/*
 		clientServiceTCPAddr, err := net.ResolveTCPAddr(CLIENT_SERVICE.con_type, CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port)

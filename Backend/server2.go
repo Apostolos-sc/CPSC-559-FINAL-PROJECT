@@ -11,6 +11,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net"
@@ -20,9 +21,9 @@ import (
 )
 
 type connection struct {
-	host string;
-	port string;
-	con_type string;
+	host     string
+	port     string
+	con_type string
 }
 
 type gameRoom struct {
@@ -31,22 +32,33 @@ type gameRoom struct {
 
 var (
 	gameRoomsMutex sync.Mutex
-	gameRooms map[string] int
+	gameRooms      map[string]int
 )
 
 var MAX_PLAYERS int = 4
 var PROXY = connection{"10.0.0.87", "9000", "tcp"}
 var GAME_SERVICE = connection{"10.0.0.24", "8081", "tcp"}
+var DB = connection{"10.0.0.24", "3306", "tcp"}
+var db_user = "root"
+var db_pw = "password"
 
 func main() {
-	if(connectToProxy()) {
+	db, err := sql.Open("mysql", db_user+":"+db_pw+"@"+DB.con_type+"("+DB.host+":"+DB.port+")/test")
+	if err != nill {
+		fmt.Printf("There was an issue when connecting to the DB server at %s:%s with Error : %s.\n", DB.host, DB.port, err.Error())
+	} else {
+		fmt.PrintF("Successfully connected to the database at %s:%s")
+	}
+
+	defer db.Close()
+	if connectToProxy() {
 		//Listen for Game Service Requests if you were successfully registered at the Proxy
 		fmt.Println("Successful registration to proxy.")
 		gameServiceTCPAddr, err := net.ResolveTCPAddr(GAME_SERVICE.con_type, GAME_SERVICE.host+":"+GAME_SERVICE.port)
 		if err != nil {
 			fmt.Printf("Unable to resolve IP")
 		}
-	
+
 		// Start TCP Listener for the server
 		listener, err := net.ListenTCP("tcp", gameServiceTCPAddr)
 		if err != nil {
@@ -56,11 +68,11 @@ func main() {
 		}
 		//close Listener
 		defer listener.Close()
-	
+
 		//Continuously Listen for game Connections
 		for {
 			//infinite listening
-			conn, err:= listener.Accept()
+			conn, err := listener.Accept()
 			if err != nil {
 				log.Fatal(err)
 				os.Exit(1)
@@ -113,9 +125,9 @@ func handleGameConnection(conn net.Conn) {
 			//Call function that generates access code
 			//add user to game room in database (command[1] stored in db)
 			//Wait for Acknowledgement
-			var accessCode  string = generateAccessCode()
+			var accessCode string = generateAccessCode()
 			//time.Sleep(8 * time.Second)
-			conn.Write([]byte("Room Created:"+accessCode))
+			conn.Write([]byte("Room Created:" + accessCode))
 			if err != nil {
 				fmt.Println("Write data failed:", err.Error())
 				os.Exit(1)
@@ -146,7 +158,7 @@ func handleGameConnection(conn net.Conn) {
 		} else if strings.Compare(command[0], "Join Room") == 0 {
 			//Check if a user wants to join a room. command[0] should contain the command and command[1] should contain the access code.
 			//command[2] should contain the username
-			if(len(command) == 2) {
+			if len(command) == 2 {
 				//the command has 2 elements, let's check if the second element is a valid game room code.
 				//First check the hasmap
 				gameRoomsMutex.Lock()
@@ -182,7 +194,7 @@ func handleGameConnection(conn net.Conn) {
 					if ok {
 						//return successfully joined
 						//generate questions for the game Room
-						if (generateQuestions(command[1])) {
+						if generateQuestions(command[1]) {
 							//if successfully generated questions send
 							//question to the proxy, and proxy sends questions to clients
 						} else {
@@ -252,9 +264,9 @@ func connectToProxy() bool {
 		//If the proxy accepted us, send the address we will be serving at
 		fmt.Printf("Received message: %s.\n", string(received[:n]))
 		//Create a string IpAddress:PortNumber
-		var gameServiceAddress = GAME_SERVICE.host+":"+GAME_SERVICE.port
+		var gameServiceAddress = GAME_SERVICE.host + ":" + GAME_SERVICE.port
 		_, err = conn.Write([]byte(gameServiceAddress))
-		if(err != nil) {
+		if err != nil {
 			fmt.Println("Write data failed:", err.Error())
 			os.Exit(1)
 		} else {
@@ -268,11 +280,11 @@ func connectToProxy() bool {
 				if strings.Compare(string(received[:n]), "Received Address") == 0 {
 					fmt.Printf("Received message: %s.\n", string(received[:n]))
 					conn.Close()
-					return true;
+					return true
 				}
 			}
 		}
 	}
 	conn.Close()
-	return false;
+	return false
 }
