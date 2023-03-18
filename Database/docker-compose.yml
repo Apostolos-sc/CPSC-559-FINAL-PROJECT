@@ -14,10 +14,13 @@ services:
       - 4406:3306
     volumes:
       - ./database_server/db1/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
-      - ./history.txt:/history.txt
-      - ./db.py:/db.py
     networks:
       - overlay
+    healthcheck:
+      test: "mysql --user=root --password=password --execute \"SHOW DATABASES;\""
+      interval: 2s
+      timeout: 30s
+      retries: 15
 
   db2:
     image: database_server
@@ -30,15 +33,19 @@ services:
     container_name: "database_server_2"
     restart: "no"
     depends_on:
-      - db1
+      db1:
+        condition: service_healthy
     ports:
       - 5506:3306
     volumes:
       - ./database_server/db2/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
-      - ./history.txt:/history.txt
-      - ./db.py:/db.py
     networks:
       - overlay
+    healthcheck:
+      test: "mysql --user=root --password=password --execute \"SHOW DATABASES;\""
+      interval: 2s
+      timeout: 30s
+      retries: 15
 
   mysql_monitor:
     image: database_monitor
@@ -46,8 +53,10 @@ services:
     build: database_monitor
     restart: "no"
     depends_on:
-      - db1
-      - db2
+      db1:
+        condition: service_healthy
+      db2:
+        condition: service_healthy
     networks:
       - overlay
 

@@ -1,12 +1,6 @@
 FROM mysql:5.7
 
-#Reset entrypoint and cmd from base image
-ENTRYPOINT []
-CMD []
-
 RUN yum update -y && yum install -y iputils
+RUN chown mysql:mysql /var/run/mysqld
 
-COPY initiate.sh .
-
-ENTRYPOINT ["./initiate.sh"]
-
+COPY initiate.sh ./docker-entrypoint-initdb.d/initiate.sh
