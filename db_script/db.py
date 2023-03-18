@@ -58,9 +58,9 @@ table_name = 'gameRoom'
 create_gameRoom_table = '''
 CREATE TABLE IF NOT EXISTS {0} (
     accessCode VARCHAR(10) PRIMARY KEY,
-    currentRound INT NOT NULL,
+    currentRound INT NOT NULL
 );'''.format(table_name)
-
+execute_query(connection, create_gameRoom_table)
 table_name = 'roomQuestions'
 create_roomQuestions_table = '''
 CREATE TABLE IF NOT EXISTS {0} (
@@ -83,7 +83,8 @@ create_roomUser_table = '''
 CREATE TABLE IF NOT EXISTS {0} (
     username VARCHAR(15) PRIMARY KEY,
     accessCode VARCHAR(10) NOT NULL,
-    points INT NOT NULL
+    points INT NOT NULL,
+    ready TINYINT (1)
 );'''.format(table_name)
 execute_query(connection, create_roomUser_table)
 

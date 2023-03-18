@@ -47,10 +47,12 @@ type roomQuestions struct {
 	question_10 int
 }
 
+//ready should be 0 or 1 to indicate if a player is ready to start
 type roomUser struct  {
 	username string
 	accessCode string
 	points int
+	ready int
 }
 type connection struct {
 	host     string
@@ -88,16 +90,16 @@ func main() {
 	db.SetMaxIdleConns(10)
 	
 	defer db.Close()
-
-    ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancelfunc()
-    err = db.PingContext(ctx)
-    if err != nil {
-        log.Printf("Errors : %s, while pinging DB", err)
-        return
-    } else {
-		fmt.Printf("Successfully connected to the database at %s:%s.\n", DB_master.host, DB_master.port)
+	//Pinging db to check status
+	if testConnection(db) {
+		//successful test
+	} else {
+		//Handle error -> attempt to connect to slave
 	}
+	//handle db error
+
+
+	/*
 	results, err := db.Query("SELECT * FROM questions WHERE question_id >1419")
 	if err != nil {
 		fmt.Printf("There was an issue while performing query.\n", err.Error())
@@ -112,6 +114,76 @@ func main() {
 		// and then print out the tag's Name attribute
 		log.Printf(q.question)
 	}
+	queryErr := insertRoomUser(db, "Apostolos", "testCode", 0, -1)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	}
+	queryErr = insertRoomUser(db, "Long", "testCode", 0, -1)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	}
+	queryErr = insertRoomUser(db, "Danny", "testCode", 0, -1)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	}
+	queryErr = insertGameRoom(db, "testCode", 0)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	}
+	queryErr = insertGameRoom(db, "bobbyRoom", 0)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	}
+	queryErr = insertGameRoom(db, "diddyRoom", 0)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	}
+	queryErr = insertRoomQuestions(db, "testCode", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	}
+	rQs, queryErr := fetchRoomQuestions(db, "testCode")
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	} else {
+		fmt.Printf("Successfully pulled roomQuestions for %s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n", rQs.accessCode, rQs.question_1, rQs.question_2, rQs.question_3, rQs.question_4, rQs.question_5, rQs.question_6, rQs.question_7, rQs.question_8, rQs.question_9, rQs.question_10)
+	}
+	rooms, queryErr := fetchRooms(db)
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	} else {
+		fmt.Printf("Successfully pulled Rooms from db.\n")	
+		for i := 0; i < len(rooms); i++ {
+			fmt.Printf("The Values of gameRooms are : %v\n", rooms[i])
+		}
+	}
+
+	roomUsers, queryErr := fetchRoomUsers(db, "testCode")
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	} else {
+		fmt.Printf("Successfully pulled Room Users from db.\n")	
+		for i := 0; i < len(rooms); i++ {
+			fmt.Printf("The Values of roomUsers are : %v\n", roomUsers[i])
+		}
+	}
+
+	roomUsers[0].points = 50
+	queryErr = updateRoomUser(db, roomUsers[0])
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	} else {
+		fmt.Print("Successfully updated user.\n")
+	}
+
+	rooms[0].currentRound = 1
+	queryErr = updateRoom(db, rooms[0])
+	if queryErr != nil {
+		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
+	} else {
+		fmt.Print("Successfully updated room.\n")
+	}
+	*/
 	if connectToProxy() {
 		//Listen for Game Service Requests if you were successfully registered at the Proxy
 		fmt.Println("Successful registration to proxy.")
@@ -371,8 +443,21 @@ func connectToProxy() bool {
 	return false
 }
 
-func insertRoomUser(db *sql.DB, username string, accessCode string, points int) error {
-    query := "INSERT INTO roomUser(username, accessCode, points) VALUES (?, ?, ?)"
+func testConnection(db *sql.DB) bool {
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancelfunc()
+    err := db.PingContext(ctx)
+    if err != nil {
+        log.Printf("Errors : %s, while pinging DB", err)
+        return false
+    } else {
+		fmt.Printf("Successfully accessed database at %s:%s.\n", DB_master.host, DB_master.port)
+		return true
+	}
+}
+
+func updateRoom(db *sql.DB, room gameRoom) error {
+    query := "UPDATE gameRoom SET currentRound = ? WHERE accesscode = ?"
     ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancelfunc()
     stmt, err := db.PrepareContext(ctx, query)
@@ -381,9 +466,9 @@ func insertRoomUser(db *sql.DB, username string, accessCode string, points int) 
         return err
     }
     defer stmt.Close()
-    res, err := stmt.ExecContext(ctx, username, accessCode, points)
+    res, err := stmt.ExecContext(ctx, room.currentRound, room.accessCode)
     if err != nil {
-        log.Printf("Error %s when inserting row into roomUser table", err)
+        log.Printf("Error %s when updating gameRoom table", err)
         return err
     }
     rows, err := res.RowsAffected()
@@ -391,12 +476,35 @@ func insertRoomUser(db *sql.DB, username string, accessCode string, points int) 
         log.Printf("Error %s when finding rows affected", err)
         return err
     }
-    log.Printf("%d roomUser created with information %s, %s, %d ", rows)
+    log.Printf("%d rows updated gameRoom now contains information %s, %d", rows, room.accessCode, room.currentRound)
+    return nil
+}
+func updateRoomUser(db *sql.DB, user roomUser) error {
+    query := "UPDATE roomUser SET points = ?, ready = ? WHERE username = ?"
+    ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancelfunc()
+    stmt, err := db.PrepareContext(ctx, query)
+    if err != nil {
+        log.Printf("Error %s when preparing SQL statement", err)
+        return err
+    }
+    defer stmt.Close()
+    res, err := stmt.ExecContext(ctx, user.points, user.ready, user.username)
+    if err != nil {
+        log.Printf("Error %s when updating roomUser table", err)
+        return err
+    }
+    rows, err := res.RowsAffected()
+    if err != nil {
+        log.Printf("Error %s when finding rows affected", err)
+        return err
+    }
+    log.Printf("%d rows updated user now contains information %s, %s, %d, %d ", rows, user.username, user.accessCode, user.points, user.ready)
     return nil
 }
 
-func updateUserPoints(db *sql.DB, username string, points int) error {
-    query := "UPDATE roomUser SET points = ? WHERE username = ?"
+func insertRoomUser(db *sql.DB, username string, accessCode string, points int, ready int) error {
+    query := "INSERT INTO roomUser(username, accessCode, points, ready) VALUES (?, ?, ?, ?)"
     ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancelfunc()
     stmt, err := db.PrepareContext(ctx, query)
@@ -405,7 +513,7 @@ func updateUserPoints(db *sql.DB, username string, points int) error {
         return err
     }
     defer stmt.Close()
-    res, err := stmt.ExecContext(ctx, username, points)
+    res, err := stmt.ExecContext(ctx, username, accessCode, points, ready)
     if err != nil {
         log.Printf("Error %s when inserting row into roomUser table", err)
         return err
@@ -415,7 +523,7 @@ func updateUserPoints(db *sql.DB, username string, points int) error {
         log.Printf("Error %s when finding rows affected", err)
         return err
     }
-    log.Printf("%d roomUser created with information %s, %s, %d ", rows)
+    log.Printf("%d roomUser created with information %s, %s, %d, %d ", rows, username, accessCode, points, ready)
     return nil
 }
 
@@ -463,7 +571,7 @@ func insertRoomQuestions(db *sql.DB, accessCode string, q1 int, q2 int, q3 int, 
         log.Printf("Error %s when finding rows affected", err)
         return err
     }
-    log.Printf("%d roomQuestions created with information %s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d.", rows, accessCode, )
+    log.Printf("%d roomQuestions created with information %s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d.", rows, accessCode, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10)
     return nil
 }
 
@@ -536,7 +644,7 @@ func fetchRoomUsers(db *sql.DB, accessCode string) ([]roomUser, error) {
     var roomUsers = []roomUser{}
     for rows.Next() {
         var rUser roomUser
-        if err := rows.Scan(&rUser.username, &rUser.accessCode, &rUser.points); err != nil {
+        if err := rows.Scan(&rUser.username, &rUser.accessCode, &rUser.points, &rUser.ready); err != nil {
             return []roomUser{}, err
         }
         roomUsers = append(roomUsers, rUser)
