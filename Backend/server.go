@@ -63,7 +63,7 @@ type connection struct {
 type gameRoom struct {
 	accessCode string
 	currentRound int
-	players map[string]int
+	players map[string] roomUser
 }
 
 var (
@@ -114,15 +114,15 @@ func main() {
 		// and then print out the tag's Name attribute
 		log.Printf(q.question)
 	}
-	queryErr := insertRoomUser(db, "Apostolos", "testCode", 0, -1)
+	queryErr := insertRoomUser(db, "Apostolos", "testCode", 0, 0)
 	if queryErr != nil {
 		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
 	}
-	queryErr = insertRoomUser(db, "Long", "testCode", 0, -1)
+	queryErr = insertRoomUser(db, "Long", "testCode", 0, 0)
 	if queryErr != nil {
 		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
 	}
-	queryErr = insertRoomUser(db, "Danny", "testCode", 0, -1)
+	queryErr = insertRoomUser(db, "Danny", "testCode", 0, 0)
 	if queryErr != nil {
 		fmt.Printf("Error when executing query : %s\n", queryErr.Error())
 	}
@@ -215,7 +215,7 @@ func main() {
 			}
 			fmt.Printf("Incoming connection from : %s\n", conn.RemoteAddr().String())
 			//Sub routine is called and we pass to it the connection parameter to be handled
-			go handleGameConnection(conn)
+			go handleGameConnection(db, conn)
 		}
 	} else {
 		fmt.Println("Failed to register server at the proxy.")
@@ -237,7 +237,7 @@ func main() {
 
 //Assumption for now that the user doesn't disconnect, he just keeps playing till game is over.
 //generate UserID as unique identifier, screen name is chosen, can be the same with other people's name.
-func handleGameConnection(conn net.Conn) {
+func handleGameConnection(db *sql.DB, conn net.Conn) {
 	//each game Room Connection should be handled till the game is over
 	//might wanna check and see if the game request is in proper format / incase of data corruption.
 	//send message
@@ -264,37 +264,63 @@ func handleGameConnection(conn net.Conn) {
 			//Call function that generates access code
 			//add user to game room in database (command[1] stored in db)
 			//Wait for Acknowledgement
-			accessCode = generateAccessCode()
-			//time.Sleep(8 * time.Second)
-			conn.Write([]byte("Room Created:" + accessCode))
-			if err != nil {
-				fmt.Printf("Failed to send the game Room access Code to the proxy. %s\n", err.Error())
-			}
-			fmt.Printf("Game Room Access Code : %s was sent to the Proxy.\n", accessCode)
-			//Wait for acknowledgement
-			nResponse, err := conn.Read(responseBuffer)
-			if err != nil {
-				fmt.Printf("There was an error while receiving the Game Room Creation Acknowledgment from the proxy.\n")
-			}
-			if strings.Compare(string(responseBuffer[:nResponse]), "Access Code Received") == 0 {
-				//Room should be activated now
-				gameRoomsMutex.Lock()
-				if gameRooms == nil {
-					//map is unitiliazed
-					gameRooms = make(map[string]gameRoom)
+			player, queryErr := fetchRoomUser(db, command[1])
+			if player!= nil {
+				fmt.Printf("Error while creating room. USER_IN_ROOM_ALREADY_ERROR.\n")
+				conn.Write([]byte("USER_IN_ROOM_ALREADY_ERROR"))
+				if err != nil {
+					fmt.Printf("Failed to send USER_IN_ROOM_ALREADY_ERROR. %s\n", err.Error())
 				}
-				//add game room to the Game Rooms map
-				gameRooms[accessCode] = gameRoom{players: make(map[string]int)}
-				//Add player to the hash
-				gameRooms[accessCode].players[command[1]] = 1
-				gameRoomsMutex.Unlock()
-				fmt.Printf("Player with username %s has been added to the Game Room with access Code : %s\n", command[1], accessCode)
-				fmt.Printf("Access Code : %s for the game Room was Received by the Proxy.\n", accessCode)
-				//Now we are ready to add access code to the valid game rooms
-				fmt.Printf("Game room with Access Code : %s is active. Listening for requests....\n", accessCode)
 			} else {
-				//Corrupt message from the proxy?? See if we need to handle this
-				fmt.Printf("Proxy replied with %s\n", string(responseBuffer[:nResponse]))
+				if queryErr == sql.ErrNoRows {
+					//username not found in the userRoom table, let's create a room.
+					accessCode = generateAccessCode()
+					//time.Sleep(8 * time.Second)
+					conn.Write([]byte("Room Created:" + accessCode))
+					if err != nil {
+						fmt.Printf("Failed to send the game Room access Code to the proxy. %s\n", err.Error())
+					}
+					fmt.Printf("Game Room Access Code : %s was sent to the Proxy.\n", accessCode)
+					//Wait for acknowledgement
+					nResponse, err := conn.Read(responseBuffer)
+					if err != nil {
+						fmt.Printf("There was an error while receiving the Game Room Creation Acknowledgment from the proxy.\n")
+					}
+					if strings.Compare(string(responseBuffer[:nResponse]), "Access Code Received") == 0 {
+						//Room should be activated now
+						gameRoomsMutex.Lock()
+						if gameRooms == nil {
+							//map is unitiliazed
+							gameRooms = make(map[string]gameRoom)
+						}
+						//add game room to the Game Rooms map
+						gameRooms[accessCode] = gameRoom{accessCode: accessCode, currentRound: 0, players: make(map[string] roomUser)}
+						queryErr := insertGameRoom(db, gameRooms[accessCode])
+						if queryErr != nil {
+							if queryErr != nil {
+								fmt.Printf("Error when inserting game Room information in the database, Command Executing : %s : %s\n", request, queryErr.Error())
+							}
+						}
+						//Add player to the hash
+						gameRooms[accessCode].players[command[1]] = roomUser{username: command[1], accessCode: accessCode, points: 0, ready: -1}
+						queryErr = insertRoomUser(db, gameRooms[accessCode].players[command[1]])
+						if queryErr != nil {
+							if queryErr != nil {
+								fmt.Printf("Error when inserting game Room information in the database, Command Executing : %s : %s\n", request, queryErr.Error())
+							}
+						}
+						gameRoomsMutex.Unlock()
+						fmt.Printf("Player with username %s has been added to the Game Room with access Code : %s\n", command[1], accessCode)
+						fmt.Printf("Access Code : %s for the game Room was Received by the Proxy.\n", accessCode)
+						//Now we are ready to add access code to the valid game rooms
+						fmt.Printf("Game room with Access Code : %s is active. Listening for requests....\n", accessCode)
+					} else {
+						//Corrupt message from the proxy?? See if we need to handle this
+						fmt.Printf("Proxy replied with %s\n", string(responseBuffer[:nResponse]))
+					}
+				} else {
+					//some other type of error.
+				}
 			}
 		} else if strings.Compare(command[0], "Join Room") == 0 {
 			//Join Room:User Name:Access Code
@@ -306,6 +332,7 @@ func handleGameConnection(conn net.Conn) {
 			//check if the player is part of the room already
 			_, ok := gameRooms[command[2]].players[command[1]]
 			if ok {
+				//don't have to query the db, if the player was added earlier to the room it will be in the hashmap of players.
 				//player already in the room, must be reconnection request
 				conn.Write([]byte("RECONNECT_SUCCESS"))
 				if err != nil {
@@ -314,23 +341,80 @@ func handleGameConnection(conn net.Conn) {
 					fmt.Printf("Successfully reconnected user : %s to Game Room : %s\n", command[1], command[2])
 				}
 			} else {
-				//new player, check if room is full
-				if len(gameRooms[command[2]].players) < MAX_PLAYERS {
-					//player can join, there is room, assign it in memory
-					gameRooms[command[2]].players[command[1]] = 1
-					fmt.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
-					_, err = conn.Write([]byte("JOIN_SUCCESS"))
+				//Let's also check and see if he is in a different room.
+				player, queryErr := fetchRoomUser(db, command[1])
+				if player!= nil {
+					fmt.Printf("Error while joining room. USER_IN_ANOTHER_ROOM_ERROR.\n")
+					conn.Write([]byte("USER_IN_ANOTHER_ROOM_ERROR"))
 					if err != nil {
-						fmt.Printf("There was an error while sending JOIN SUCCESS to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
-						//This will be handled by proxy replication when the time comes, we should assume proxy is down.
+						fmt.Printf("Failed to send USER_IN_ANOTHER_ROOM_ERROR. %s\n", err.Error())
 					}
 				} else {
-					_, err = conn.Write([]byte("ROOM_FULL"))
-					if err != nil {
-						fmt.Printf("There was an error while sending ROOM FULL to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+					//let's check the type of queryError we got.
+					if queryErr == sql.ErrNoRows {
+						//user is not in any room
+						if len(gameRooms[command[2]].players) < MAX_PLAYERS {
+							//player can join, there is room, assign it in memory
+							gameRooms[command[2]].players[command[1]] = roomUser{username: command[1], accessCode: accessCode, points: 0, ready: -1}
+							fmt.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
+							_, err = conn.Write([]byte("JOIN_SUCCESS"))
+							if err != nil {
+								fmt.Printf("There was an error while sending JOIN SUCCESS to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+								//This will be handled by proxy replication when the time comes, we should assume proxy is down.
+							}
+						} else {
+							_, err = conn.Write([]byte("ROOM_FULL"))
+							if err != nil {
+								fmt.Printf("There was an error while sending ROOM_FULL to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+							} else {
+								fmt.Printf("Unable to add user to : %s to Game Room : %s. Room is full. ROOM_FULL sent to proxy.\n", command[1], command[2])
+							}
+						}
 					} else {
-						fmt.Printf("Unable to add user to : %s to Game Room : %s. Room is full. ROOM FULL sent to proxy.\n", command[1], command[2])
+						//potential DB problems
 					}
+				}
+			}
+			gameRoomsMutex.Unlock()
+		}else if strings.Compare(command[0], "Ready") {
+			//update locally and in the database
+			gameRoomsMutex.Lock()
+			gameRooms[command[2]].players[command[1]].ready = 1
+			queryErr = updateRoomUser(db, gameRooms[command[2]].players[command[1]])
+			if queryErr != nil {
+				fmt.Printf("There was an error while updating the user in the db.\n", queryErr.Error())
+				gameRooms[command[2]].players[command[1]].ready = 0
+				_, err = conn.Write([]byte("READY_USER_DB_UPDATE_ERROR"))
+				if err != nil {
+					fmt.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+				} else {
+					fmt.Printf("Error READY_USER_DB_UPDATE_ERROR was sent to the proxy.\n")
+				}		
+			} else {
+				//check if all users are ready
+				var all_players_ready bool = true
+				for key, element := range gameRooms[command[2]].players {
+					if element.ready == 0 {
+						all_players_ready = false
+						break
+					}
+				}
+				if all_players_ready == true {
+					//send to proxy all players ready
+					_, err = conn.Write([]byte("READY_SUCCESS_ALL_PLAYERS_READY"))
+					if err != nil {
+						fmt.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+					} else {
+						fmt.Printf("Error READY_USER_DB_UPDATE_ERROR was sent to the proxy.\n")
+					}	
+				} else {
+					//send to proxy READY_SUCCESS
+					_, err = conn.Write([]byte("READY_SUCCESS"))
+					if err != nil {
+						fmt.Printf("There was an error while sending READY_SUCCESS to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+					} else {
+						fmt.Printf("Error READY_USER was sent to the proxy.\n")
+					}	
 				}
 			}
 			gameRoomsMutex.Unlock()
@@ -503,7 +587,7 @@ func updateRoomUser(db *sql.DB, user roomUser) error {
     return nil
 }
 
-func insertRoomUser(db *sql.DB, username string, accessCode string, points int, ready int) error {
+func insertRoomUser(db *sql.DB, player roomUser) error {
     query := "INSERT INTO roomUser(username, accessCode, points, ready) VALUES (?, ?, ?, ?)"
     ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancelfunc()
@@ -513,7 +597,7 @@ func insertRoomUser(db *sql.DB, username string, accessCode string, points int, 
         return err
     }
     defer stmt.Close()
-    res, err := stmt.ExecContext(ctx, username, accessCode, points, ready)
+    res, err := stmt.ExecContext(ctx, player.username, player.accessCode, player.points, player.ready)
     if err != nil {
         log.Printf("Error %s when inserting row into roomUser table", err)
         return err
@@ -523,11 +607,11 @@ func insertRoomUser(db *sql.DB, username string, accessCode string, points int, 
         log.Printf("Error %s when finding rows affected", err)
         return err
     }
-    log.Printf("%d roomUser created with information %s, %s, %d, %d ", rows, username, accessCode, points, ready)
+    log.Printf("%d roomUser created with information %s, %s, %d, %d ", rows, player.username, player.accessCode, player.points, player.ready)
     return nil
 }
 
-func insertGameRoom(db *sql.DB, accessCode string, currentRound int) error {
+func insertGameRoom(db *sql.DB, room gameRoom) error {
     query := "INSERT INTO gameRoom(accessCode, currentRound) VALUES (?, ?)"
     ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancelfunc()
@@ -537,7 +621,7 @@ func insertGameRoom(db *sql.DB, accessCode string, currentRound int) error {
         return err
     }
     defer stmt.Close()
-    res, err := stmt.ExecContext(ctx, accessCode, currentRound)
+    res, err := stmt.ExecContext(ctx, room.accessCode, room.currentRound)
     if err != nil {
         log.Printf("Error %s when inserting row into gameRoom table", err)
         return err
@@ -547,7 +631,7 @@ func insertGameRoom(db *sql.DB, accessCode string, currentRound int) error {
         log.Printf("Error %s when finding rows affected", err)
         return err
     }
-    log.Printf("%d gameRoom created with information %s, %d ", rows, accessCode, currentRound)
+    log.Printf("%d gameRoom created with information %s, %d ", rows, room.accessCode, room.currentRound)
     return nil
 }
 
@@ -653,4 +737,30 @@ func fetchRoomUsers(db *sql.DB, accessCode string) ([]roomUser, error) {
         return []roomUser{}, err
     }
     return roomUsers, nil
+}
+
+func fetchRoomUser(db *sql.DB, username string) (*roomUser, error) {
+    fmt.Printf("Search for room user %s.\n", username)
+    query := "SELECT * FROM roomUser where username = ?"
+    ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancelfunc()
+    stmt, err := db.PrepareContext(ctx, query)
+    if err != nil {
+        log.Printf("Error %s when preparing SQL statement", err)
+        return nil, err
+    }
+    defer stmt.Close()
+    var player roomUser
+    row := stmt.QueryRowContext(ctx, username)
+    if err := row.Scan(&player.username, &player.accessCode, &player.points, &player.ready); err != nil {
+        fmt.Printf("There was an error while fetching Room User %s, Error : %s\n", username, err.Error())
+		return nil, err
+    }
+	var player_mem *roomUser 
+	player_mem = new(roomUser)
+	(*player_mem).username = player.username
+	(*player_mem).accessCode = player.accessCode
+	(*player_mem).points = player.points
+	(*player_mem).ready = player.ready
+    return player_mem, nil
 }

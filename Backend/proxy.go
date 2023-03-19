@@ -373,8 +373,15 @@ func handleClientRequest(clientConn *websocket.Conn) {
 						//be accessed
 						err = clientConn.WriteMessage(1, []byte("ROOM_CREATION_ERROR"))
 						if err != nil {
-							fmt.Printf("Unable to write to client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
+							fmt.Printf("Unable to send ROOM_CREATION_ERROR to client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
 							//Handle
+						}
+					} else if strings.Compare(response[0], "USER_IN_ROOM_ALREADY_ERROR") == 0 {
+						err = clientConn.WriteMessage(1, []byte("USER_IN_ROOM_ALREADY_ERROR"))
+						if err != nil {
+							fmt.Printf("Unable to send USER_IN_ROOM_ALREADY_ERROR to client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
+							//Handle
+							done = true
 						}
 					} else {
 						//Corrupt message? Or timeout handling here - figure it out later some recovery
@@ -461,9 +468,72 @@ func handleClientRequest(clientConn *websocket.Conn) {
 				//Handle game start
 			} else if strings.Compare(command[0], "Ready") == 0 {
 				//Ready to start request from client
-				fmt.Printf("")
+				fmt.Printf("Ready Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 				if len(command) == 3 {
+					//Command must be in the right format, let's work
+					gameRoomMutex.Lock()
+					serverMutex.Lock()
+					_, ok := gameRooms[command[2]]
+					//Room exists
+					if ok == true {
+						//we need to contact the game server, send the command
+						fmt.Printf("Requesting from Server with address %s a Ready Request.\n", gameRooms[command[2]].gameRoomConn.RemoteAddr().String())
+						_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
+						if err != nil {
+							fmt.Printf("Sending Ready Command %s to the server of game Room %s failed.\n", request, command[2])
+							//Must Handle
+						}
+						nServerResponse, err := gameRooms[command[2]].gameRoomConn.Read([]byte(serverResponseBuffer))
+						if err != nil {
+							fmt.Printf("Receiving Response from Server for Ready Failed. SEND SERVER_RESPONSE_ERROR to client\n")
+							err = clientConn.WriteMessage(1, []byte("SERVER_RESPONSE_ERROR"))
+							if err != nil {
+								fmt.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : \n", err.Error())
+								//handle, client disconnected?
+							}
+						} else {
+							ready_response := string(serverResponseBuffer[:nServerResponse])
+							if strings.Compare(join_response, "READY_SUCCESS") == 0 {
+								//Successful READY, let's send response to client
+								fmt.Printf("Client %s with IP %s has successfully set their status as ready to start the game.\n", command[1], clientConn.RemoteAddr().String())
+								err = clientConn.WriteMessage(1, []byte(serverResponseBuffer[:nServerResponse]))
+								if err != nil {
+									fmt.Printf("There was an issue while sending READY Success acknowledgment to the client. \n")
+									//probably just close connection?
+									//assume player disconnected?
+								}
+							} else if strings.Compare(join_response, "READY_SUCCESS_ALL_PLAYERS_READY") == 0 {
+								//Successful READY, let's send response to client
+								fmt.Printf("Client %s with IP %s has successfully set their status as ready to start the game and all players are ready to start.\n", command[1], clientConn.RemoteAddr().String())
+								err = clientConn.WriteMessage(1, []byte("READY_SUCCESS_ALL_PLAYERS_READY"))
+								if err != nil {
+									fmt.Printf("There was an issue while sending READY Success acknowledgment to the client. \n")
+									//probably just close connection?
+									//assume player disconnected?
+								}
+							} else {
+								fmt.Printf("The server sent the following response : %s\n", ready_response)
+								err = clientConn.WriteMessage(1, []byte(ready_response))
+								if err != nil {
+									fmt.Printf("There was an issue while sending the servers' answer to the client. \n")
+									//probably just close connection?
+									//assume player disconnected?
+								}
+							}
+						}
+					} else {
 
+					}
+					serverMutex.Unlock()
+					gameRoomMutex.Unlock()
+				} else {
+					fmt.Printf("Ready Request %s has an in correct format. COMMUNICATION_PROTOCOL_ERROR will be sent to the client.\n")
+					err = clientConn.WriteMessage(1, []byte("READY_REQUEST_FORMAT_ERROR"))
+					if err != nil {
+						fmt.Println("Sending READY_REQUEST_FORMAT_ERROR to client failed:", err.Error())
+						//keepServicing = false
+						//say goodbye maybe?
+					}
 				}
 			} else {
 				fmt.Printf("Request %s has an in correct format. COMMUNICATION_PROTOCOL_ERROR will be sent to the client.\n")
@@ -542,7 +612,7 @@ func checkRequest(command []string) bool {
 				return false
 			}
 		} else {
-			if strings.Compare(command[0], "Join Room") == 0 || strings.Compare(command[0], "Start Game") == 0 || strings.Compare(command[0], "Stop Game") == 0 {
+			if strings.Compare(command[0], "Join Room") == 0 || strings.Compare(command[0], "Start Game") == 0 || strings.Compare(command[0], "Stop Game") == 0 || strings.Compare(command[0], "Ready"){
 				return true
 			} else {
 				return false
