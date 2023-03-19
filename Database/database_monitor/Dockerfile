@@ -8,6 +8,6 @@ RUN wget https://github.com/mysql/mysql-utilities/archive/release-1.6.5.tar.gz
 RUN tar xf release-1.6.5.tar.gz
 RUN cd mysql-utilities-release-1.6.5 \
     && python ./setup.py build \
-    && python ./setup.py install \
+    && python ./setup.py install
 
-ENTRYPOINT mysqlfailover --force --master=root:password@db1:3306 --discover-slaves-login=root:password auto
+ENTRYPOINT ["mysqlfailover", "--force", "--master=root:password@db1:3306", "--discover-slaves-login=root:password", "auto"]
