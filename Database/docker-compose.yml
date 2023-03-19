@@ -52,6 +52,7 @@ services:
     container_name: "database_monitor"
     build: database_monitor
     restart: "no"
+    tty: true
     depends_on:
       db1:
         condition: service_healthy

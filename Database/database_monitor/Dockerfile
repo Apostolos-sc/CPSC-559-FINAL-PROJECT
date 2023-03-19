@@ -10,4 +10,4 @@ RUN cd mysql-utilities-release-1.6.5 \
     && python ./setup.py build \
     && python ./setup.py install
 
-ENTRYPOINT ["mysqlfailover", "--force", "--master=root:password@db1:3306", "--discover-slaves-login=root:password", "auto"]
+CMD mysqlfailover --force --master=root:password@db1:3306 --discover-slaves-login=root:password auto
