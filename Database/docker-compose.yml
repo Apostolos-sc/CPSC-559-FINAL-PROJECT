@@ -4,7 +4,7 @@ services:
     image: database_server
     build: database_server
     env_file:
-      - ./database_server/.env
+      - ./database_server/db1/.env
     environment:
       ID: 1
       REPLICA_ID: 2
@@ -26,7 +26,7 @@ services:
     image: database_server
     build: database_server
     env_file:
-      - ./database_server/.env
+      - ./database_server/db2/.env
     environment:
       ID: 2
       REPLICA_ID: 1

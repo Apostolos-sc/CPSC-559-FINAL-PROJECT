@@ -9,3 +9,4 @@ log_slave_updates
 master_info_repository=TABLE
 report_host=db2
 report_port=3306
+skip-external-locking
