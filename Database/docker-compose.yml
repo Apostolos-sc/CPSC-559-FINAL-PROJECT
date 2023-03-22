@@ -9,11 +9,12 @@ services:
       ID: 1
       REPLICA_ID: 2
     container_name: "database_server_1"
-    restart: "no"
+    restart: always
     ports:
       - 4406:3306
     volumes:
       - ./database_server/db1/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./sqldump:/sqldump
     networks:
       - overlay
     healthcheck:
@@ -31,7 +32,7 @@ services:
       ID: 2
       REPLICA_ID: 1
     container_name: "database_server_2"
-    restart: "no"
+    restart: always
     depends_on:
       db1:
         condition: service_healthy
@@ -39,6 +40,7 @@ services:
       - 5506:3306
     volumes:
       - ./database_server/db2/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./sqldump:/sqldump
     networks:
       - overlay
     healthcheck:
@@ -51,7 +53,7 @@ services:
     image: database_monitor
     container_name: "database_monitor"
     build: database_monitor
-    restart: "no"
+    restart: always
     tty: true
     depends_on:
       db1:

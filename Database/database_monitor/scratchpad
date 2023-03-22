@@ -1,6 +1,5 @@
+mysqlfailover --force --master=root:password@db1:3306 --discover-slaves-login=root:password health
 mysqlfailover --force --master=root:password@db2:3306 --discover-slaves-login=root:password health
-
-insert into test_table VALUES (1429, 'When did WW I end?', '1918', '1918', '1821', '1949',' 1925');
 
 USE mydb;
 CREATE TABLE IF NOT EXISTS questions (
@@ -14,5 +13,9 @@ CREATE TABLE IF NOT EXISTS questions (
 );
 insert into questions VALUES (1429, 'When did WW I end?', '1918', '1918', '1821', '1949',' 1925');
 
+use mydb;
+select * from questions;
 
 insert into questions VALUES (1430, 'When did WW II end?', '1918', '1945', '1821', '1949',' 1925');
+
+docker rm -f database_server_1
