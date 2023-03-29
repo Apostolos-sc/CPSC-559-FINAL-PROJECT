@@ -77,6 +77,7 @@ func main() {
 	}
 }
 
+
 func requestCreate(conn net.Conn, request string) {
 	_, err := conn.Write([]byte(request))
 	if err != nil {
