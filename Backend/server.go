@@ -436,6 +436,13 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					}
 					deleteRoomQuestions(db, command[2])
 					deleteGameRoom(db, command[2])
+					for key, _ := range(gameRooms[command[2]].players){
+						log.Printf("Deleting user %s from player hashmap for game %s", key, command[2])
+						//delete player from hashmap
+						delete(gameRooms[command[2]].players, key)
+					}
+					//delete room from hashmap
+					delete(gameRooms, command[2])
 				} else {
 					gameRooms[command[2]].players[command[1]].offline = 1
 					updateRoomUser(db, gameRooms[command[2]].players[command[1]])
@@ -443,19 +450,30 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					//need to check these queries in case db flops
 				}
 			} else {
+				log.Printf("Game has not started yet while user %s disconnected from room %s.\n", command[1], command[2])
 				//Last player in the room that disconnected. Let's delete the room, delete users from room, and delete room questions
 				if len(gameRooms[command[2]].players) == 1 {
+					log.Printf("There is only one user in the room, let's delete him and his room.")
 					//only one player in the room, delete the player
 					deleteRoomUser(db, command[1])
 					deleteRoomQuestions(db, command[2])
 					deleteGameRoom(db, command[2])
+					delete(gameRooms[command[2]].players, command[1])
+					delete(gameRooms, command[2])
+					conn.Close()
+					return
 				} else {
+					log.Printf("There are more than one user in the room : %s\n", command[2])
 					//delete the User
 					deleteRoomUser(db, command[1])
+					delete(gameRooms[command[2]].players, command[1])
 					var allPlayersReady = true
-					for _, value := range gameRooms[command[2]].players {
+					for key, value := range gameRooms[command[2]].players {
 						if value.ready != 1 {
 							allPlayersReady = false
+							log.Printf("Player %s is not ready to start after player disconnection.\n", key)
+						} else {
+							log.Printf("Player %s is ready to start after player disconnection.\n", key)
 						}
 					}
 					if allPlayersReady {
@@ -478,9 +496,9 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 						//not all players are ready, send disconnect message to proxy
 						_, err = conn.Write([]byte("Lobby Disconnect:"+command[1]))
 						if err != nil {
-							log.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+							log.Printf("There was an error while sending Lobby Disconnect:%s to proxy. Game Room: %s, Error: %s\n", command[1], command[2], err.Error())
 						} else {
-							log.Printf("Message READY_ALL_PLAYERS_READY was sent to the proxy.\n")
+							log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
 						}	
 					}
 				}
@@ -947,6 +965,6 @@ func deleteRoomQuestions(db *sql.DB, accessCode string) error {
         log.Printf("Error %s when finding rows affected.\n", err.Error())
         return err
     }
-    log.Printf("Game Room %s was successfully deleted.\n", accessCode)
+    log.Printf("Game Room Questions %s were successfully deleted.\n", accessCode)
     return nil
 }
