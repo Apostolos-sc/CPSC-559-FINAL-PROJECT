@@ -21,7 +21,7 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- Position to start replication or point-in-time recovery from
 --
 
--- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000003', MASTER_LOG_POS=312296;
+-- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000003', MASTER_LOG_POS=313322;
 
 --
 -- Current Database: `mysql`
@@ -128,7 +128,7 @@ CREATE TABLE `engine_cost` (
 
 LOCK TABLES `engine_cost` WRITE;
 /*!40000 ALTER TABLE `engine_cost` DISABLE KEYS */;
-INSERT INTO `engine_cost` VALUES ('default',0,'io_block_read_cost',NULL,'2023-03-31 06:10:29',NULL),('default',0,'memory_block_read_cost',NULL,'2023-03-31 06:10:29',NULL);
+INSERT INTO `engine_cost` VALUES ('default',0,'io_block_read_cost',NULL,'2023-03-31 20:21:40',NULL),('default',0,'memory_block_read_cost',NULL,'2023-03-31 20:21:40',NULL);
 /*!40000 ALTER TABLE `engine_cost` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -345,7 +345,7 @@ CREATE TABLE `innodb_index_stats` (
 
 LOCK TABLES `innodb_index_stats` WRITE;
 /*!40000 ALTER TABLE `innodb_index_stats` DISABLE KEYS */;
-INSERT INTO `innodb_index_stats` VALUES ('mydb','questions','PRIMARY','2023-03-31 06:12:00','n_diff_pfx01',1452,20,'question_id'),('mydb','questions','PRIMARY','2023-03-31 06:12:00','n_leaf_pages',23,NULL,'Number of leaf pages in the index'),('mydb','questions','PRIMARY','2023-03-31 06:12:00','size',24,NULL,'Number of pages in the index'),('mysql','gtid_executed','PRIMARY','2023-03-31 06:10:29','n_diff_pfx01',0,1,'source_uuid'),('mysql','gtid_executed','PRIMARY','2023-03-31 06:10:29','n_diff_pfx02',0,1,'source_uuid,interval_start'),('mysql','gtid_executed','PRIMARY','2023-03-31 06:10:29','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mysql','gtid_executed','PRIMARY','2023-03-31 06:10:29','size',1,NULL,'Number of pages in the index'),('sys','sys_config','PRIMARY','2023-03-31 06:10:29','n_diff_pfx01',6,1,'variable'),('sys','sys_config','PRIMARY','2023-03-31 06:10:29','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('sys','sys_config','PRIMARY','2023-03-31 06:10:29','size',1,NULL,'Number of pages in the index');
+INSERT INTO `innodb_index_stats` VALUES ('mydb','gameRoom','PRIMARY','2023-03-31 20:22:37','n_diff_pfx01',0,1,'accessCode'),('mydb','gameRoom','PRIMARY','2023-03-31 20:22:37','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','gameRoom','PRIMARY','2023-03-31 20:22:37','size',1,NULL,'Number of pages in the index'),('mydb','questions','PRIMARY','2023-03-31 20:22:37','n_diff_pfx01',17,1,'question_id'),('mydb','questions','PRIMARY','2023-03-31 20:22:37','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','questions','PRIMARY','2023-03-31 20:22:37','size',1,NULL,'Number of pages in the index'),('mydb','roomQuestions','PRIMARY','2023-03-31 20:22:37','n_diff_pfx01',0,1,'accessCode'),('mydb','roomQuestions','PRIMARY','2023-03-31 20:22:37','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','roomQuestions','PRIMARY','2023-03-31 20:22:37','size',1,NULL,'Number of pages in the index'),('mydb','roomUser','PRIMARY','2023-03-31 20:22:37','n_diff_pfx01',0,1,'username'),('mydb','roomUser','PRIMARY','2023-03-31 20:22:37','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','roomUser','PRIMARY','2023-03-31 20:22:37','size',1,NULL,'Number of pages in the index'),('mysql','gtid_executed','PRIMARY','2023-03-31 20:21:40','n_diff_pfx01',0,1,'source_uuid'),('mysql','gtid_executed','PRIMARY','2023-03-31 20:21:40','n_diff_pfx02',0,1,'source_uuid,interval_start'),('mysql','gtid_executed','PRIMARY','2023-03-31 20:21:40','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mysql','gtid_executed','PRIMARY','2023-03-31 20:21:40','size',1,NULL,'Number of pages in the index'),('sys','sys_config','PRIMARY','2023-03-31 20:21:41','n_diff_pfx01',6,1,'variable'),('sys','sys_config','PRIMARY','2023-03-31 20:21:41','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('sys','sys_config','PRIMARY','2023-03-31 20:21:41','size',1,NULL,'Number of pages in the index');
 /*!40000 ALTER TABLE `innodb_index_stats` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -373,7 +373,7 @@ CREATE TABLE `innodb_table_stats` (
 
 LOCK TABLES `innodb_table_stats` WRITE;
 /*!40000 ALTER TABLE `innodb_table_stats` DISABLE KEYS */;
-INSERT INTO `innodb_table_stats` VALUES ('mydb','questions','2023-03-31 06:12:00',1452,24,0),('mysql','gtid_executed','2023-03-31 06:10:29',0,1,0),('sys','sys_config','2023-03-31 06:10:29',6,1,0);
+INSERT INTO `innodb_table_stats` VALUES ('mydb','gameRoom','2023-03-31 20:22:37',0,1,0),('mydb','questions','2023-03-31 20:22:37',18,1,0),('mydb','roomQuestions','2023-03-31 20:22:37',0,1,0),('mydb','roomUser','2023-03-31 20:22:37',0,1,0),('mysql','gtid_executed','2023-03-31 20:21:40',0,1,0),('sys','sys_config','2023-03-31 20:21:41',6,1,0);
 /*!40000 ALTER TABLE `innodb_table_stats` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -556,7 +556,7 @@ CREATE TABLE `server_cost` (
 
 LOCK TABLES `server_cost` WRITE;
 /*!40000 ALTER TABLE `server_cost` DISABLE KEYS */;
-INSERT INTO `server_cost` VALUES ('disk_temptable_create_cost',NULL,'2023-03-31 06:10:29',NULL),('disk_temptable_row_cost',NULL,'2023-03-31 06:10:29',NULL),('key_compare_cost',NULL,'2023-03-31 06:10:29',NULL),('memory_temptable_create_cost',NULL,'2023-03-31 06:10:29',NULL),('memory_temptable_row_cost',NULL,'2023-03-31 06:10:29',NULL),('row_evaluate_cost',NULL,'2023-03-31 06:10:29',NULL);
+INSERT INTO `server_cost` VALUES ('disk_temptable_create_cost',NULL,'2023-03-31 20:21:40',NULL),('disk_temptable_row_cost',NULL,'2023-03-31 20:21:40',NULL),('key_compare_cost',NULL,'2023-03-31 20:21:40',NULL),('memory_temptable_create_cost',NULL,'2023-03-31 20:21:40',NULL),('memory_temptable_row_cost',NULL,'2023-03-31 20:21:40',NULL),('row_evaluate_cost',NULL,'2023-03-31 20:21:40',NULL);
 /*!40000 ALTER TABLE `server_cost` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -707,7 +707,7 @@ CREATE TABLE `tables_priv` (
 
 LOCK TABLES `tables_priv` WRITE;
 /*!40000 ALTER TABLE `tables_priv` DISABLE KEYS */;
-INSERT INTO `tables_priv` VALUES ('localhost','mysql','mysql.session','user','boot@connecting host','0000-00-00 00:00:00','Select',''),('localhost','sys','mysql.sys','sys_config','root@localhost','2023-03-31 06:10:29','Select','');
+INSERT INTO `tables_priv` VALUES ('localhost','mysql','mysql.session','user','boot@connecting host','0000-00-00 00:00:00','Select',''),('localhost','sys','mysql.sys','sys_config','root@localhost','2023-03-31 20:21:41','Select','');
 /*!40000 ALTER TABLE `tables_priv` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -899,7 +899,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
-INSERT INTO `user` VALUES ('localhost','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-03-31 06:10:35',NULL,'N'),('localhost','mysql.session','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-03-31 06:10:29',NULL,'Y'),('localhost','mysql.sys','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-03-31 06:10:29',NULL,'Y'),('%','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-03-31 06:10:35',NULL,'N'),('%','mydb_user_1','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*361111C1FC84C1135A6B3CEC2A934A5C19B8C61F','N','2023-03-31 06:10:35',NULL,'N');
+INSERT INTO `user` VALUES ('localhost','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-03-31 20:21:46',NULL,'N'),('localhost','mysql.session','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-03-31 20:21:41',NULL,'Y'),('localhost','mysql.sys','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-03-31 20:21:41',NULL,'Y'),('%','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-03-31 20:21:46',NULL,'N'),('%','mydb_user_1','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*361111C1FC84C1135A6B3CEC2A934A5C19B8C61F','N','2023-03-31 20:21:46',NULL,'N');
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -950,6 +950,29 @@ CREATE DATABASE /*!32312 IF NOT EXISTS*/ `mydb` /*!40100 DEFAULT CHARACTER SET l
 USE `mydb`;
 
 --
+-- Table structure for table `gameRoom`
+--
+
+DROP TABLE IF EXISTS `gameRoom`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `gameRoom` (
+  `accessCode` varchar(10) NOT NULL,
+  `currentRound` int(11) NOT NULL,
+  PRIMARY KEY (`accessCode`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `gameRoom`
+--
+
+LOCK TABLES `gameRoom` WRITE;
+/*!40000 ALTER TABLE `gameRoom` DISABLE KEYS */;
+/*!40000 ALTER TABLE `gameRoom` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `questions`
 --
 
@@ -979,10 +1002,68 @@ INSERT INTO `questions` VALUES (1,'In which US state is the active Mount Rainier
 UNLOCK TABLES;
 
 --
+-- Table structure for table `roomQuestions`
+--
+
+DROP TABLE IF EXISTS `roomQuestions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `roomQuestions` (
+  `accessCode` varchar(10) NOT NULL,
+  `question_1_id` int(11) DEFAULT NULL,
+  `question_2_id` int(11) DEFAULT NULL,
+  `question_3_id` int(11) DEFAULT NULL,
+  `question_4_id` int(11) DEFAULT NULL,
+  `question_5_id` int(11) DEFAULT NULL,
+  `question_6_id` int(11) DEFAULT NULL,
+  `question_7_id` int(11) DEFAULT NULL,
+  `question_8_id` int(11) DEFAULT NULL,
+  `question_9_id` int(11) DEFAULT NULL,
+  `question_10_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`accessCode`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `roomQuestions`
+--
+
+LOCK TABLES `roomQuestions` WRITE;
+/*!40000 ALTER TABLE `roomQuestions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `roomQuestions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `roomUser`
+--
+
+DROP TABLE IF EXISTS `roomUser`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `roomUser` (
+  `username` varchar(15) NOT NULL,
+  `accessCode` varchar(10) NOT NULL,
+  `points` int(11) NOT NULL,
+  `ready` tinyint(1) DEFAULT NULL,
+  `offline` tinyint(1) DEFAULT NULL,
+  PRIMARY KEY (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `roomUser`
+--
+
+LOCK TABLES `roomUser` WRITE;
+/*!40000 ALTER TABLE `roomUser` DISABLE KEYS */;
+/*!40000 ALTER TABLE `roomUser` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- GTID state at the end of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED='bc828bd5-cf8a-11ed-b3ef-0242c0a85002:1-10';
+SET @@GLOBAL.GTID_PURGED='a52a86ff-d001-11ed-bd72-0242ac170002:1-13';
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -993,4 +1074,4 @@ SET @@GLOBAL.GTID_PURGED='bc828bd5-cf8a-11ed-b3ef-0242c0a85002:1-10';
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-03-31  6:12:42
+-- Dump completed on 2023-03-31 20:22:46
