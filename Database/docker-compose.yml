@@ -10,11 +10,10 @@ services:
       REPLICA_ID: 2
     container_name: "database_server_1"
     restart: always
-    ports:
-      - 4406:3306
     volumes:
       - ./database_server/db1/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
       - ./sqldump:/sqldump
+      - ./questions.sql:/questions.sql
     networks:
       - overlay
     healthcheck:
@@ -36,8 +35,6 @@ services:
     depends_on:
       db1:
         condition: service_healthy
-    ports:
-      - 5506:3306
     volumes:
       - ./database_server/db2/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
       - ./sqldump:/sqldump
@@ -63,5 +60,19 @@ services:
     networks:
       - overlay
 
+  nginx:
+    container_name: nginx
+    image: nginx
+    ports:
+      - "4406:3306"
+    depends_on:
+      db1:
+        condition: service_healthy
+      db2:
+        condition: service_healthy
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - overlay
 networks:
   overlay:

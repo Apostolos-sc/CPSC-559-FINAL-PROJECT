@@ -19,3 +19,5 @@ select * from questions;
 insert into questions VALUES (1430, 'When did WW II end?', '1918', '1945', '1821', '1949',' 1925');
 
 docker rm -f database_server_1
+
+mysqldump -u root -ppassword --all-databases --master-data=2 > /sqldump/dump.sql
