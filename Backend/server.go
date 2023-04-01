@@ -275,17 +275,28 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					if queryErr == sql.ErrNoRows {
 						//user is not in any room
 						if len(gameRooms[command[2]].players) < MAX_PLAYERS {
-							//player can join, there is room, assign it in memory
-							gameRooms[command[2]].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: -1}
-							//we need to also check for errors for the sql query
-							insertRoomUser(db, gameRooms[command[2]].players[command[1]])
-							log.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
-							_, err = conn.Write([]byte("JOIN_SUCCESS"))
-							if err != nil {
-								log.Printf("There was an error while sending JOIN SUCCESS to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
-								//This will be handled by proxy replication when the time comes, we should assume proxy is down.
+							if gameRooms[command[2]].currentRound == 0 {
+								//player can join, there is room, assign it in memory
+								gameRooms[command[2]].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: -1}
+								//we need to also check for errors for the sql query
+								insertRoomUser(db, gameRooms[command[2]].players[command[1]])
+								log.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
+								_, err = conn.Write([]byte("JOIN_SUCCESS"))
+								if err != nil {
+									log.Printf("There was an error while sending JOIN SUCCESS to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+									//This will be handled by proxy replication when the time comes, we should assume proxy is down.
+								} else {
+									log.Printf("Successful sent JOIN_SUCCESS to user : %s\n", command[1])
+								}
 							} else {
-								log.Printf("Successful sent JOIN_SUCCESS to user : %s\n", command[1])
+								log.Printf("Game is underway, user %s cannot join room.\n", command[1], command[2])
+								_, err = conn.Write([]byte("GAME_UNDERWAY"))
+								if err != nil {
+									log.Printf("There was an error while sending GAME_UNDERWAY to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+									//This will be handled by proxy replication when the time comes, we should assume proxy is down.
+								} else {
+									log.Printf("Successful sent GAME_UNDERWAY to proxy for %s's join request to Game Room %s.\n", command[1], command[2])
+								}
 							}
 						} else {
 							//The room is full send error to proxy
@@ -311,7 +322,6 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			queryErr := updateRoomUser(db, gameRooms[command[2]].players[command[1]])
 			if queryErr != nil {
 				log.Printf("There was an error while updating the user in the db.\n", queryErr.Error())
-				//gameRooms[command[2]].players[command[1]].ready = 0
 				_, err = conn.Write([]byte("READY_USER_DB_UPDATE_ERROR"))
 				if err != nil {
 					log.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
@@ -390,12 +400,22 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 						player_object_string = player_object_string+"{\"username\":\""+key+"\",\"points\":\""+strconv.Itoa(value.points)+"\"},"
 					}
 					//We need to delete data from database
+					for key, _ := range gameRooms[command[2]].players {
+						deleteRoomUser(db, key)
+					}
+					deleteGameRoom(db, command[2])
+					deleteRoomQuestions(db, command[2])
 					_, err = conn.Write([]byte("Game Over:"+player_object_string[:len(player_object_string)-1] + "]"+"}"))
 					if err != nil {
 						log.Printf("There was an error while sending Game Over to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+						//proxy replication?
 					} else {
-						log.Printf("Message Everyone Responsed was sent to the proxy.\n")
+						log.Printf("Message Game over:%s]} was sent to the proxy.\n", player_object_string[:len(player_object_string)-1])
 					}
+					log.Printf("Game Room %s communications will be terminated.\n", command[2])
+					conn.Close()
+					gameRoomsMutex.Unlock()
+					break
 				}
 				playersAnswered = 0;
 				playersAnsweredCorrect = 0
@@ -417,19 +437,12 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				}
 			}
 			gameRoomsMutex.Unlock()
-		} else if strings.Compare(command[0], "Stop Game") == 0 {
-			//added arbirtrarily so the compiler doesn't complain. More logic to be done.
-			//code is getting very long, hard to maintain. Might need to write functions for each
-			//command
-			// close conn
-			conn.Close()
-			break
 		} else if strings.Compare(command[0], "Disconnect") == 0 {
 			//Disconnect:Username:AccessCode
 			//Proxy informs us that the client disconnected
 			gameRoomsMutex.Lock()
 			if(gameRooms[command[2]].currentRound > 0) {
-				if numOfDisconnectedPlayers-1 == 0 {
+				if len(gameRooms[command[2]].players) - numOfDisconnectedPlayers-1 == 0 {
 					//Last player in the room that disconnected. Let's terminate the game, delete users from room, room questions
 					for key, _ := range gameRooms[command[2]].players {
 						deleteRoomUser(db, key)
@@ -443,6 +456,10 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					}
 					//delete room from hashmap
 					delete(gameRooms, command[2])
+					log.Printf("Game Room : %s has stopped servicing players.\n", command[2])
+					conn.Close()
+					gameRoomsMutex.Unlock()
+					return
 				} else {
 					gameRooms[command[2]].players[command[1]].offline = 1
 					updateRoomUser(db, gameRooms[command[2]].players[command[1]])
@@ -460,6 +477,8 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					deleteGameRoom(db, command[2])
 					delete(gameRooms[command[2]].players, command[1])
 					delete(gameRooms, command[2])
+					gameRoomsMutex.Unlock()
+					log.Printf("Game Room : %s has stopped servicing players.\n", command[2])
 					conn.Close()
 					return
 				} else {
@@ -490,7 +509,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 						if err != nil {
 							log.Printf("There was an error while sending All Ready message to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
 						} else {
-							log.Printf("Message All REady was sent to the proxy.\n")
+							log.Printf("Message All Ready was sent to the proxy.\n")
 						}	
 					} else {
 						//not all players are ready, send disconnect message to proxy
@@ -528,9 +547,9 @@ func generateAccessCode() string {
 		log.Printf("Access Code was uniquely generated : %s", string(responseData))
 		_, ok := gameRooms[strings.TrimSpace(string(responseData))] 
 		if ok {
-			log.Printf("Room with access Code : %s exists. Will generate another one!.\n", string(responseData))
+			log.Printf("Room with access Code : %s exists. Will generate another one!.\n", strings.TrimSpace(string(responseData)))
 		} else {
-			log.Printf("Room with access Code : %s was generated!.\n", string(responseData))
+			log.Printf("Room with access Code : %s was generated!.\n", strings.TrimSpace(string(responseData)))
 			return strings.TrimSpace(string(responseData))
 		}
 
