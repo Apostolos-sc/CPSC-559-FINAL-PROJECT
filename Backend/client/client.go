@@ -17,13 +17,13 @@ import (
 )
 
 type connection struct {
-	host string;
-	port string;
-	con_type string;
+	host     string
+	port     string
+	con_type string
 }
 
-//Address that the proxy listens for clients
-var PROXY = connection {"10.0.0.2", "8000", "tcp"}
+// Address that the proxy listens for clients
+var PROXY = connection{"10.0.0.2", "8000", "tcp"}
 
 var USERNAME string = "testUser"
 
@@ -76,7 +76,6 @@ func main() {
 		break
 	}
 }
-
 
 func requestCreate(conn net.Conn, request string) {
 	_, err := conn.Write([]byte(request))
