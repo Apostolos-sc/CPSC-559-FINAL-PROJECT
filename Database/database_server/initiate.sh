@@ -3,6 +3,7 @@
 if [[ $ID -eq 2 ]] ; then
     if ping -c1 db"$REPLICA_ID" ; then
         echo "Set db1 as master from db2"
+        sleep 30s
         mysql --host="db$REPLICA_ID" -u root -ppassword -e "CREATE USER IF NOT EXISTS 'mydb_user_$REPLICA_ID'@'%' IDENTIFIED BY 'mydb_pwd_$REPLICA_ID';GRANT REPLICATION SLAVE ON *.* TO 'mydb_user_$REPLICA_ID'@'%'; FLUSH PRIVILEGES;"
         mysql --host="db$REPLICA_ID" -u root -ppassword -e "RESET MASTER;FLUSH TABLES WITH READ LOCK;SHOW MASTER STATUS;"
         mysqldump --host="db$REPLICA_ID" -u root -ppassword --all-databases --master-data=2 > /sqldump/dump.sql

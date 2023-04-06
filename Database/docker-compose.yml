@@ -65,6 +65,7 @@ services:
     image: nginx
     ports:
       - "4406:3306"
+    tty: true
     depends_on:
       db1:
         condition: service_healthy
