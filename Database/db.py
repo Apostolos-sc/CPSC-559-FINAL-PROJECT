@@ -61,14 +61,17 @@ def execute_query(connection, query):
 
 table_name = 'gameRoom'
 create_gameRoom_table = '''
-CREATE TABLE IF NOT EXISTS {0} (
+CREATE TABLE IF NOT EXISTS gameRoom (
     accessCode VARCHAR(10) PRIMARY KEY,
-    currentRound INT NOT NULL
+    currentRound INT NOT NULL,
+    numOfPlayersAnswered INT NOT NULL,
+    numOfPlayersAnsweredCorrect INT NOT NULL,
+    numOfDisconnectedPlayers INT NOT NULL
 );'''.format(table_name)
 execute_query(connection, create_gameRoom_table)
 table_name = 'roomQuestions'
 create_roomQuestions_table = '''
-CREATE TABLE IF NOT EXISTS {0} (
+CREATE TABLE IF NOT EXISTS roomQuestions (
     accessCode VARCHAR(10) PRIMARY KEY,
     question_1_id INT,
     question_2_id INT,
@@ -85,17 +88,20 @@ CREATE TABLE IF NOT EXISTS {0} (
 execute_query(connection, create_roomQuestions_table)
 table_name = 'roomUser'
 create_roomUser_table = '''
-CREATE TABLE IF NOT EXISTS {0} (
+CREATE TABLE IF NOT EXISTS roomUser (
     username VARCHAR(15) PRIMARY KEY,
     accessCode VARCHAR(10) NOT NULL,
     points INT NOT NULL,
-    ready TINYINT (1)
+    ready TINYINT (1),
+    offline TINYINT (1),
+    roundAnswer INT NOT NULL,
+    correctAnswer TINYINT (1)
 );'''.format(table_name)
 execute_query(connection, create_roomUser_table)
 
 table_name = 'questions'
 create_questions_table = '''
-CREATE TABLE IF NOT EXISTS {0} (
+CREATE TABLE IF NOT EXISTS questions (
     question_id INT PRIMARY KEY,
     question VARCHAR(3000) character set utf8 NOT NULL,
     answer VARCHAR(1000) character set utf8  NOT NULL,
