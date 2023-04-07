@@ -23,7 +23,7 @@ type gameRoom struct {
 }
 
 var client_counter = 0
-var ip_address = "10.0.0.105"
+var ip_address = "10.0.0.2"
 
 // SERVER_REGISTRATION Address to be listening for servers to indicate they want to serve
 var SERVER_REGISTRATION = connection{ip_address, "9000", "tcp"}

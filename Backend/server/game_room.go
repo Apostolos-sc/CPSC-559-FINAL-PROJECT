@@ -341,11 +341,64 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					updateRoomUser(db, gameRooms[command[2]].players[command[1]])
 					gameRooms[command[2]].numOfDisconnectedPlayers++
 					updateRoom(db, gameRooms[command[2]])
-					_, err = conn.Write([]byte("Game Disconnect:" + command[1]))
-					if err != nil {
-						log.Printf("There was an error while sending Lobby Disconnect:%s to proxy. Game Room: %s, Error: %s\n", command[1], command[2], err.Error())
+					var all_active_players_answered = true
+					for _, value := range gameRooms[command[2]].players {
+						if value.offline == 0 {
+							if value.roundAnswer != gameRooms[command[2]].currentRound {
+								all_active_players_answered = false
+								break
+							}
+						}
+					}
+					if all_active_players_answered == true {
+						//all active players answered, let's send next round information
+						if gameRooms[command[2]].currentRound < 10 {
+							gameRooms[command[2]].currentRound++
+							updateRoom(db, gameRooms[command[2]])
+							var player_object_string = "\"leaderboard\":["
+							for key, value := range gameRooms[command[2]].players {
+								player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
+							}
+							_, err = conn.Write([]byte("Everyone Responded:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_1 + "\",\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_2 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_3 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_4 + "\"]," + player_object_string[:len(player_object_string)-1] + "]}"))
+							if err != nil {
+								log.Printf("There was an error while sending Everyone Responded to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+							} else {
+								log.Printf("Message Everyone Responsed was sent to the proxy.\n")
+							}
+							timer = time.Now()
+							gameRooms[command[2]].numOfPlayersAnswered = 0
+							gameRooms[command[2]].numOfPlayersAnsweredCorrect = 0
+							updateRoom(db, gameRooms[command[2]])
+						} else {
+							var player_object_string string = "{\"leaderboard\":["
+							for key, value := range gameRooms[command[2]].players {
+								player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
+							}
+							//We need to delete data from database
+							for key, _ := range gameRooms[command[2]].players {
+								deleteRoomUser(db, key)
+							}
+							deleteGameRoom(db, command[2])
+							deleteRoomQuestions(db, command[2])
+							_, err = conn.Write([]byte("Game Over:" + player_object_string[:len(player_object_string)-1] + "]" + "}"))
+							if err != nil {
+								log.Printf("There was an error while sending Game Over to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+								//proxy replication?
+							} else {
+								log.Printf("Message Game over:%s]} was sent to the proxy.\n", player_object_string[:len(player_object_string)-1])
+							}
+							log.Printf("Game Room %s communications will be terminated.\n", command[2])
+							conn.Close()
+							gameRoomsMutex.Unlock()
+							break //Break out of the for loop
+						}
 					} else {
-						log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
+						_, err = conn.Write([]byte("Game Disconnect:" + command[1]))
+						if err != nil {
+							log.Printf("There was an error while sending Lobby Disconnect:%s to proxy. Game Room: %s, Error: %s\n", command[1], command[2], err.Error())
+						} else {
+							log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
+						}
 					}
 					//need to check these queries in case db flops
 				}
