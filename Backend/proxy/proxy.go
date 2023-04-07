@@ -1,13 +1,5 @@
-//Author         : Apostolos Scondrianis
-//Created On     : 28-02-2023
-//Last Edited By : Apostolos Scondrianis
-//Last Edit On   : 01-03-2023
-//Filename       : proxy.go
-//Version        : 0.2
-
 package main
 
-//Proxy
 import (
 	"log"
 	"net"
@@ -63,13 +55,13 @@ var client_counter = 0
 //global ticker for tracking time intervals
 //var ticker = time.NewTicker(2000 * time.Millisecond)
 
-// Maximum number of game rooms a server should handle
+// MAX_ROOMS_PER_SERVER Maximum number of game rooms a server should handle
 var MAX_ROOMS_PER_SERVER int = 2
 
-// Address to be listening for servers to indicate they want to serve
+// SERVER_REGISTRATION Address to be listening for servers to indicate they want to serve
 var SERVER_REGISTRATION = connection{"10.0.0.2", "9000", "tcp"}
 
-// Address to be listening for clients
+// CLIENT_SERVICE Address to be listening for clients
 var CLIENT_SERVICE = connection{"10.0.0.2", "8000", "tcp"}
 
 // Will be used to keep track of servers that are servicing

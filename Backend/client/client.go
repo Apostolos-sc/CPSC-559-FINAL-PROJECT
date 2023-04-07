@@ -1,10 +1,3 @@
-//Author         : Apostolos Scondrianis
-//Created On     : 01-03-2023
-//Last Edited By : Apostolos Scondrianis
-//Last Edit On   : 02-03-2023
-//Filename       : client.go
-//Version        : 0.1
-
 // client to emulate functionality of web client
 package main
 
@@ -22,7 +15,7 @@ type connection struct {
 	con_type string
 }
 
-// Address that the proxy listens for clients
+// PROXY Address that the proxy listens for clients
 var PROXY = connection{"10.0.0.2", "8000", "tcp"}
 
 var USERNAME string = "testUser"

@@ -1,10 +1,3 @@
-//Author         : Apostolos Scondrianis
-//Created On     : 28-02-2023
-//Last Edited By : Apostolos Scondrianis
-//Last Edit On   : 02-03-2023
-//Filename       : server.go
-//Version        : 0.4
-
 // Hashmap may be an issue? Maybe we want multiple servers to handle
 // the same gameRoom incase one server is overly busy, think about
 // during fault tolerance, replication stage, scalability
