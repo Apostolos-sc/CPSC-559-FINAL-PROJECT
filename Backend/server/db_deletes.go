@@ -1,8 +1,10 @@
-package server
+package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
+	"time"
 )
 
 func deleteGameRoom(db *sql.DB, accessCode string) error {

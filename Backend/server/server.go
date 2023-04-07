@@ -2,7 +2,7 @@
 // the same gameRoom incase one server is overly busy, think about
 // during fault tolerance, replication stage, scalability
 
-package server
+package main
 
 import (
 	"context"
