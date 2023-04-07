@@ -66,9 +66,9 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						log.Printf("There are more players in the room{%d}, let's contact the server, delete the user: %s\n", len(gameRooms[previousCommandString[2]].players), previousCommandString[1])
 						// The game room can be null when the previousCommand is not CreateGameRoom but JoinRoom
 						// Test this, added on line 397
-						//if gameRoomConn == nil {
-						//	gameRoomConn = gameRooms[previousCommandString[2]].gameRoomConn
-						//}
+						if gameRoomConn == nil {
+							gameRoomConn = gameRooms[previousCommandString[2]].gameRoomConn
+						}
 						disconnectServerInform(gameRoomConn, previousCommandString[1], previousCommandString[2])
 						delete(gameRooms[previousCommandString[2]].players, previousCommandString[1])
 						nResponse, err = gameRooms[previousCommandString[2]].gameRoomConn.Read(serverResponseBuffer)
@@ -102,6 +102,28 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 									if err != nil {
 										log.Printf("There was an issue while sending Lobby Disconnect acknowledgment to player %s with IP address : %s. Error : %s \n", key, value.RemoteAddr(), err.Error())
 										//We don't care, the client's own game routine needs to handle this.
+									}
+								}
+							} else if strings.Compare(disconnectResponse[0], "Everyone Responded") == 0 {
+								//Send to all connected players that everyone has responded, and the question to start next round
+								for key, value := range gameRooms[previousCommandString[2]].players {
+									err = value.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
+									if err != nil {
+										log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr() ,err.Error())
+										//Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
+									} else {
+										log.Printf("Sent Everyone Responded to player %s with IP address %s.\n", key, value.RemoteAddr())
+									}
+								}
+							} else if strings.Compare(disconnectResponse[0], "Game Over") == 0 {
+								//Send to all players that are still connected that the game is over
+								for key, value := range gameRooms[previousCommandString[2]].players {
+									err = value.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
+									if err != nil {
+										log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr() ,err.Error())
+										//Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
+									} else {
+										log.Printf("Sent Everyone Responded to player %s with IP address %s.\n", key, value.RemoteAddr())
 									}
 								}
 							}
@@ -243,7 +265,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						//we need to fix this. Server crashed-
 						err = clientConn.WriteMessage(1, []byte("Error:Server Response"))
 						if err != nil {
-							log.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : \n", err.Error())
+							log.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : %s", err.Error())
 							//we don't care if the client disconnects at this point.
 							keepServicing = false
 						}
@@ -281,6 +303,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								}
 							}
 						} else if strings.Compare(join_response_command[0], "Reconnect Success") == 0 {
+							gameRoomConn = gameRooms[command[2]].gameRoomConn
 							gameRooms[command[2]].players[command[1]] = clientConn
 							log.Printf("Player %s has successfully reconnected to game with access code %s.\n", command[1], command[2])
 							//var playerlist string = "";
