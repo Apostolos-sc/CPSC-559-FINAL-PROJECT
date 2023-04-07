@@ -1,10 +1,3 @@
-//Author         : Apostolos Scondrianis
-//Created On     : 28-02-2023
-//Last Edited By : Apostolos Scondrianis
-//Last Edit On   : 01-03-2023
-//Filename       : proxy.go
-//Version        : 0.2
-
 package main
 
 //Proxy
@@ -64,7 +57,7 @@ var client_counter = 0
 
 // Maximum number of game rooms a server should handle
 var MAX_ROOMS_PER_SERVER int = 2
-var ip_address = "10.13.62.150"
+var ip_address = "10.0.0.105"
 
 // Address to be listening for servers to indicate they want to serve
 var SERVER_REGISTRATION = connection{ip_address, "9000", "tcp"}
