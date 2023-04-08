@@ -30,6 +30,8 @@ func fetchRoomQuestions(db *sql.DB, accessCode string) error {
 		var question *Question
 		question, err = fetchQuestion(db, questions[i])
 		if err != nil {
+			log.Printf("An error occurred while fetching question with id %d. Error : %s.", i, err.Error())
+		} else {
 			gameRooms[accessCode].questions[i] = &Question{question.ID, question.question, question.answer, question.option_1, question.option_2, question.option_3, question.option_4}
 			log.Printf("Successfully assigned question with information to Game Room! : %d, %s, %s, %s, %s, %s, %s.\n", gameRooms[accessCode].questions[i].ID, gameRooms[accessCode].questions[i].question, gameRooms[accessCode].questions[i].answer, gameRooms[accessCode].questions[i].option_1, gameRooms[accessCode].questions[i].option_2, gameRooms[accessCode].questions[i].option_3, gameRooms[accessCode].questions[i].option_4)
 		}
@@ -54,20 +56,45 @@ func fetchQuestion(db *sql.DB, ID int) (*Question, error) {
 		return nil, err
 	} else {
 		log.Printf("Successfully fetched question with information : %d, %s, %s, %s, %s, %s, %s.\n", question.ID, question.question, question.answer, question.option_1, question.option_2, question.option_3, question.option_4)
+		return &question, nil
 	}
-	var question_mem *Question
-	question_mem = new(Question)
-	(*question_mem).ID = question.ID
-	(*question_mem).question = question.question
-	(*question_mem).answer = question.answer
-	(*question_mem).option_1 = question.option_1
-	(*question_mem).option_2 = question.option_2
-	(*question_mem).option_3 = question.option_3
-	(*question_mem).option_4 = question.option_4
-	return question_mem, nil
+	//var question_mem *Question
+	//question_mem = new(Question)
+	//(*question_mem).ID = question.ID
+	//(*question_mem).question = question.question
+	//(*question_mem).answer = question.answer
+	//(*question_mem).option_1 = question.option_1
+	//(*question_mem).option_2 = question.option_2
+	//(*question_mem).option_3 = question.option_3
+	//(*question_mem).option_4 = question.option_4
+
+}
+
+// Function used to fetch information about the game room : accessCode
+// This function needs to be tested
+func fetchRoom(db *sql.DB, accessCode string) error {
+	log.Printf("Getting Game Room with access code : %s", accessCode)
+	query := "select * from gameRoom WHERE accessCode = ?;"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Printf("Error %s when preparing SQL statement", err)
+		return err
+	}
+	defer stmt.Close()
+	var room gameRoom
+	row := stmt.QueryRowContext(ctx, accessCode)
+	err = row.Scan(&room.accessCode, &room.currentRound, &room.numOfPlayersAnswered, &room.numOfPlayersAnsweredCorrect, &room.numOfDisconnectedPlayers)
+	if err != nil {
+		log.Printf("There was an error while fetching game room with accessCode %s.", accessCode)
+		return err
+	}
+	gameRooms[room.accessCode] = &gameRoom{accessCode: room.accessCode, currentRound: room.currentRound, numOfPlayersAnswered: room.numOfPlayersAnswered, numOfPlayersAnsweredCorrect: room.numOfPlayersAnsweredCorrect, numOfDisconnectedPlayers: room.numOfDisconnectedPlayers, questions: make(map[int]*Question), players: make(map[string]*roomUser)}
+	log.Printf("Successfully loaded Game Room with information %s, %d, %d, %d, %d.\n", room.accessCode, gameRooms[room.accessCode].currentRound, gameRooms[room.accessCode].numOfPlayersAnswered, gameRooms[room.accessCode].numOfPlayersAnsweredCorrect, gameRooms[room.accessCode].numOfDisconnectedPlayers)
+	return nil
 }
 func fetchRooms(db *sql.DB) error {
-	gameRooms = make(map[string]*gameRoom)
 	log.Printf("Getting games")
 	query := "select * from gameRoom;"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
@@ -141,7 +168,7 @@ func fetchRoomUser(db *sql.DB, username string) (*roomUser, error) {
 	defer stmt.Close()
 	var player roomUser
 	row := stmt.QueryRowContext(ctx, username)
-	if err := row.Scan(&player.username, &player.accessCode, &player.points, &player.ready, &player.offline); err != nil {
+	if err := row.Scan(&player.username, &player.accessCode, &player.points, &player.ready, &player.offline, &player.roundAnswer, &player.correctAnswer); err != nil {
 		log.Printf("There was an error while fetching Room User %s, Error : %s\n", username, err.Error())
 		return nil, err
 	}

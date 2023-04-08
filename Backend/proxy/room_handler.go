@@ -8,6 +8,9 @@ import (
 )
 
 func handleClientRequest(clientConn *websocket.Conn, connID int) {
+	var service_completed = true
+	var command []string
+	var request string
 	var gameRoomConn *net.TCPConn = nil
 	var keepServicing = true
 	var err error
@@ -109,7 +112,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								for key, value := range gameRooms[previousCommandString[2]].players {
 									err = value.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
 									if err != nil {
-										log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr() ,err.Error())
+										log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr(), err.Error())
 										//Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
 									} else {
 										log.Printf("Sent Everyone Responded to player %s with IP address %s.\n", key, value.RemoteAddr())
@@ -120,7 +123,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								for key, value := range gameRooms[previousCommandString[2]].players {
 									err = value.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
 									if err != nil {
-										log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr() ,err.Error())
+										log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr(), err.Error())
 										//Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
 									} else {
 										log.Printf("Sent Everyone Responded to player %s with IP address %s.\n", key, value.RemoteAddr())
@@ -134,40 +137,42 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 			}
 			break
 		}
-		log.Printf("Waiting to read from client with ID %d.\n", connID)
-		_, buffer, err = clientConn.ReadMessage()
-		if err != nil {
-			log.Println("Failed to read a request from the client. Connection will be terminated.")
-			log.Printf("Previous command : %s.\n", previousCommand)
-			disconnect = true
-			continue
-		} else {
-			log.Printf("Message received from client with ID : %d.\n", connID)
-		}
-		//Assign this command as the one that was executed before
-		n = len(buffer)
-		previousCommand = string(buffer[:len(buffer)])
-		log.Printf("Previous command set as :%s", previousCommand[:n])
-		//critical access
-		if len(serverList) == 0 {
-			//Can't service Client, no live Servers.
-			log.Println("There are no servers available to service Clients. Send Error to Client. Connection Terminated.")
-			err = clientConn.WriteMessage(1, ([]byte("Error:No Server Available")))
+		if service_completed == true {
+			log.Printf("Waiting to read from client with ID %d.\n", connID)
+			_, buffer, err = clientConn.ReadMessage()
 			if err != nil {
-				log.Println("Unable to send to client Error: No Server Available:", err.Error())
+				log.Println("Failed to read a request from the client. Connection will be terminated.")
+				log.Printf("Previous command : %s.\n", previousCommand)
+				disconnect = true
+				continue
+			} else {
+				log.Printf("Message received from client with ID : %d.\n", connID)
 			}
-			keepServicing = false
-			continue
+			//Assign this command as the one that was executed before
+			n = len(buffer)
+			previousCommand = string(buffer[:len(buffer)])
+			log.Printf("Previous command set as :%s", previousCommand[:n])
+			//critical access
+			if len(serverList) == 0 {
+				//Can't service Client, no live Servers.
+				log.Println("There are no servers available to service Clients. Send Error to Client. Connection Terminated.")
+				err = clientConn.WriteMessage(1, ([]byte("Error:No Server Available")))
+				if err != nil {
+					log.Println("Unable to send to client Error: No Server Available:", err.Error())
+				}
+				keepServicing = false
+				continue
+			}
+			command = strings.Split(string(buffer[:n]), ":")
+			request = string(buffer[:n])
 		}
-		var command = strings.Split(string(buffer[:n]), ":")
-		var request = string(buffer[:n])
 		//check if proxy received a valid request
 		if checkRequest(command) {
 			if strings.Compare(command[0], "Create Room") == 0 {
 				//Critical Section
 				gameRoomMutex.Lock()
-				gameRoomAddr, err := net.ResolveTCPAddr("tcp", serverList[0].host+":"+serverList[0].port)
-				address := serverList[0].host + ":" + serverList[0].port
+				gameRoomAddr, err := net.ResolveTCPAddr("tcp", serverList[master_server_index].host+":"+serverList[master_server_index].port)
+				address := serverList[master_server_index].host + ":" + serverList[master_server_index].port
 				if err != nil {
 					log.Printf("ResolveTCPAddr failed for %s:%v\n", address, err.Error())
 					//Need to handle the case where we can't resolve the server.
@@ -203,7 +208,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 					log.Printf("Game Room successfully created. Access Code : %s and is served by : %s\n", response[1], gameRoomConn.RemoteAddr().String())
 					//Critical Section Lock
 					//Initialiaze game room struct and assign to map: gameRooms[accessCode] = gameRoom
-					gameRooms[response[1]] = gameRoom{gameRoomConn, make(map[string]*websocket.Conn)}
+					gameRooms[response[1]] = &gameRoom{gameRoomConn, make(map[string]*websocket.Conn)}
 					//player should be added to the player hashmap in the gameRoom with accessCode : response[1]
 					gameRooms[response[1]].players[command[1]] = clientConn
 					//Send acknowledgement to server that proxy received access code
@@ -363,17 +368,28 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				//format should be of Answer:Username:AccessCode:Response Assume that the format of the request is correct.
 				log.Printf("Answer Room Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 				gameRoomMutex.Lock()
+				log.Printf("Inside Answer Room Mutex.")
 				var _, ok = gameRooms[command[2]]
 				if ok {
+					log.Print("Sending Command Answer")
 					_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
 					if err != nil {
 						log.Printf("Sending Answer Command %s to the server of game Room %s failed.\n", request, command[2])
-						//we need to do server replication here
+						gameRoomConn = restartServer()
+						gameRoomMutex.Unlock()
+						service_completed = false
+						continue
 					} else {
+						//Setting Deadline to test
+						//timeoutDuration := 1 * time.Second
+						//gameRoomConn.SetReadDeadline(time.Now().Add(timeoutDuration))
 						nResponse, err = gameRooms[command[2]].gameRoomConn.Read(serverResponseBuffer)
 						if err != nil {
 							log.Printf("Proxy was unable to receive a response from the server. Error : %s.\n", err.Error())
-							//Replication
+							gameRoomConn = restartServer()
+							gameRoomMutex.Unlock()
+							service_completed = false
+							continue
 						} else {
 							//Remember we need to start informing about disconnections
 							answer_response := string(serverResponseBuffer[:nResponse])
@@ -392,7 +408,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								if len(gameRooms[command[2]].players) > 1 {
 									for key, value := range gameRooms[command[2]].players {
 										if strings.Compare(key, command[1]) != 0 {
-											err = value.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
+											err = value.WriteMessage(1, serverResponseBuffer[:nResponse])
 											if err != nil {
 												log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, err.Error())
 												//Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
@@ -442,6 +458,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							}
 						}
 					}
+					service_completed = true
 				} else {
 					log.Printf("Invalid Answer Access to the game.\n")
 					keepServicing = false
