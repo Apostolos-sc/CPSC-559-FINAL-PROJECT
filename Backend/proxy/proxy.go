@@ -22,6 +22,7 @@ type gameRoom struct {
 	players      map[string]*websocket.Conn
 }
 
+var master_server_index = 0
 var client_counter = 0
 var ip_address = "10.0.0.2"
 
@@ -74,4 +75,38 @@ func checkRequest(command []string) bool {
 	} else {
 		return false
 	}
+}
+
+func restartServer() *net.TCPConn {
+	//Call the new designated master server to load all game rooms
+	log.Printf("Attempting to call Back Up server to reestablish connections.")
+	var err error
+	master_server_index = (master_server_index + 1) % (len(serverList))
+	log.Printf("Master server index is now %d.", master_server_index)
+	serverMutex.Lock()
+	server_addr, err := net.ResolveTCPAddr("tcp", serverList[master_server_index].host+":"+serverList[master_server_index].port)
+	serverMutex.Unlock()
+	var gameRoomConn *net.TCPConn = nil
+	if len(gameRooms) > 0 {
+		for key, value := range gameRooms {
+			log.Printf("Inside mutex, calling backup server with IP address %s:%s.", serverList[master_server_index].host, serverList[master_server_index].port)
+			gameRoomConn, err = net.DialTCP("tcp", nil, server_addr)
+			if err != nil {
+				log.Printf("Failed to create a new tcp connection for game Room %s", key)
+			} else {
+				_, err = gameRoomConn.Write([]byte("Restart Room Connection:" + key + ":"))
+				if err != nil {
+					log.Printf("Failed to send USER_IN_ROOM_ALREADY_ERROR. %s\n", err.Error())
+				}
+				//We need to close previous connection -> The next line will need testing
+				//value.gameRoomConn.Close()
+				log.Printf("Previous server serving game Room : %s is %s.", key, value.gameRoomConn.RemoteAddr())
+				gameRooms[key].gameRoomConn = gameRoomConn
+				log.Printf("Successfully Reconnected game Room %s to server with addres %s.", key, gameRooms[key].gameRoomConn.RemoteAddr())
+			}
+		}
+	} else {
+		log.Printf("There are no game rooms. No connection reestablishments needed.")
+	}
+	return gameRoomConn
 }
