@@ -195,36 +195,33 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				log.Printf("Requesting from Server with address %s Game Room Creation.\n", gameRoomConn.RemoteAddr().String())
 				_, err = gameRoomConn.Write(buffer[:n])
 				if err != nil {
+				    //Server crashed after we dialed, let's pick another one
 					log.Printf("Sending the Game Room Creation Command : %s to the server failed: %s", string(buffer[:n]), err.Error())
-					//Server Crashed, time to find a new server
+					gameRoomConn = restartServer()
+					gameRoomMutex.Unlock()
+					service_completed = false
+					continue
 				}
 				//wait for response
 				nResponse, err = gameRoomConn.Read(serverResponseBuffer)
 				if err != nil {
+				    //server crashed while we were waiting for it to respond to our request
 					log.Println("Read data failed:", err.Error())
 					log.Printf("Failed to receive a response from server : %s. Will attempt to connect to another server.\n", gameRoomConn.RemoteAddr().String())
-					//failed to read from server, let's try to connect to another server and retry
-					//will fix soon
-					gameRoomConn.Close()
+					gameRoomConn = restartServer()
+					gameRoomMutex.Unlock()
+					service_completed = false
 					continue
 				}
 				var response = strings.Split(string(serverResponseBuffer[:nResponse]), ":")
 				if strings.Compare(response[0], "Room Created") == 0 {
-					//acknowledgment received. Room was received
-					//serviceComplete = true;
+					//Server allows creation of room
 					log.Printf("Game Room successfully created. Access Code : %s and is served by : %s\n", response[1], gameRoomConn.RemoteAddr().String())
-					//Critical Section Lock
 					//Initialiaze game room struct and assign to map: gameRooms[accessCode] = gameRoom
 					gameRooms[response[1]] = &gameRoom{gameRoomConn, make(map[string]*websocket.Conn)}
 					//player should be added to the player hashmap in the gameRoom with accessCode : response[1]
 					gameRooms[response[1]].players[command[1]] = clientConn
-					//Send acknowledgement to server that proxy received access code
-					_, err = gameRoomConn.Write([]byte("Access Code Received"))
-					if err != nil {
-						log.Printf("Sending Acknowledgement that the code was received to server %s failed : %s\n", gameRoomConn.RemoteAddr().String(), err.Error())
-						//handle error -> server crashed, time to find a new server
-					}
-					//Send to client success message -> If can't write, assume client disconnection, else print log info
+					//Come Back to Create Game Room, Potential Race Conditions, add timestamps
 					// string(buffer[:n]) = Create Room:Username and response[1] = accessCode
 					previousCommand = string(buffer[:n]) + ":" + response[1]
 					log.Printf("Previous command set as :%s.\n", previousCommand)
@@ -235,6 +232,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						gameRoomMutex.Unlock()
 						continue
 					} else {
+					    // Successful sent to user
 						log.Printf("Client with username %s & IP address %s received the Access Code.\n", command[1], clientConn.RemoteAddr().String())
 					}
 				} else if strings.Compare(response[0], "ROOM_CREATION_ERROR") == 0 {
@@ -247,6 +245,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						break
 					}
 				} else if strings.Compare(response[0], "USER_IN_ROOM_ALREADY_ERROR") == 0 {
+				    //User already in another room, bye bye
 					err = clientConn.WriteMessage(1, []byte("Error:User In Room Already"))
 					if err != nil {
 						log.Printf("Unable to send USER_IN_ROOM_ALREADY_ERROR to client %s: %s\n", clientConn.RemoteAddr().String(), err.Error())
@@ -269,19 +268,24 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 					log.Printf("Requesting from Server with address %s a Join Room Request.\n", gameRooms[command[2]].gameRoomConn.RemoteAddr().String())
 					_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
 					if err != nil {
+					    //Contact another server
 						log.Printf("Sending Join Room Command %s to the server of game Room %s failed.\n", request, command[2])
-						//Server disconnected -> we need to handle this
+                        gameRoomConn = restartServer()
+                        gameRoomMutex.Unlock()
+                        service_completed = false
+                        continue
 					}
+					//Potential Race Condition, Come Back might need to add timestamps, Potential buffer issue with nanoseconds
+					//if timestamp ends in zero. Test. (add semicolon maybe at the end of timestamps)
 					nResponse, err = gameRooms[command[2]].gameRoomConn.Read(serverResponseBuffer)
 					if err != nil {
-						log.Printf("Receiving Response from Server for Join Room Failed. SEND SERVER_RESPONSE_ERROR to client\n")
-						//we need to fix this. Server crashed-
-						err = clientConn.WriteMessage(1, []byte("Error:Server Response"))
-						if err != nil {
-							log.Printf("SERVER_RESPONSE_ERROR was not sent to the client. Error : %s", err.Error())
-							//we don't care if the client disconnects at this point.
-							keepServicing = false
-						}
+					    //failed to receive response for join room
+						log.Printf("Receiving Response from Server for Join Room Failed. Let's connect to another server.")
+						//Serve Crashed when receiving response, connect to another server.
+                        gameRoomConn = restartServer()
+                        gameRoomMutex.Unlock()
+                        service_completed = false
+                        continue
 					} else {
 						//received response from server
 						join_response := string(serverResponseBuffer[:nResponse])
@@ -292,13 +296,16 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							gameRoomConn = gameRooms[command[2]].gameRoomConn
 							//Successful Join, let's send response to client
 							log.Printf("Client %s with IP %s has successfully joined the Game Room %s.\n", command[1], clientConn.RemoteAddr().String(), command[2])
+							//create a string list of players that are part of the game room lobby right now
 							for key := range gameRooms[command[2]].players {
 								if strings.Compare(key, command[1]) != 0 {
 									playerlist = playerlist + key + ","
 								}
 							}
+							//send that list to the player
 							err = clientConn.WriteMessage(1, []byte(playerlist[:len(playerlist)-1]))
 							if err != nil {
+							    //player probably disconnected after joining, next iteration will handle disconnetion and comms to other players
 								log.Printf("There was an issue while sending Join Success acknowledgment to the client with IP address : %s. Error : %s \n", clientConn.RemoteAddr(), err.Error())
 								disconnect = true
 								gameRoomMutex.Unlock()
@@ -306,6 +313,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							} else {
 								//Send to the other clients that a user has joined!
 								for key, value := range gameRooms[command[2]].players {
+								    //for every player in the game room hash, except the one that sent the request, inform them of the user join
 									if strings.Compare(key, command[1]) != 0 {
 										err = value.WriteMessage(1, []byte("User Join:"+command[1]))
 										if err != nil {
@@ -316,18 +324,24 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								}
 							}
 						} else if strings.Compare(join_response_command[0], "Reconnect Success") == 0 {
+						    //update gameRoom connection for the client, to facilitate comms (it is the only way for the proxy to
+						    //know where to send the request at this specific point
 							gameRoomConn = gameRooms[command[2]].gameRoomConn
+							//re add the web socket of the player to the game room player list
 							gameRooms[command[2]].players[command[1]] = clientConn
 							log.Printf("Player %s has successfully reconnected to game with access code %s.\n", command[1], command[2])
+							//Clean up later
 							//var playerlist string = "";
-							//send to the player who is currently playing the game. we will also send the currentRound & question. will test this later->we won't need this I don't think.
-							err = clientConn.WriteMessage(1, []byte(join_response))
-							if err != nil {
-								log.Printf("There was an error with sending Reconnect Success to the client with IP : %s. Error : %s.\n", clientConn.RemoteAddr(), err.Error())
-								keepServicing = false
-							}
+ 							//send to the player who is currently playing the game. we will also send the currentRound & question. will test this later->we won't need this I don't think.
+ 							err = clientConn.WriteMessage(1, []byte(join_response))
+ 							if err != nil {
+ 								log.Printf("There was an error with sending Reconnect Success to the client with IP : %s. Error : %s.\n", clientConn.RemoteAddr(), err.Error())
+ 								//we need to handle disconnection again-> test
+ 								keepServicing = false
+ 							}
 							//Don't think we need this
 						} else if strings.Compare(join_response_command[0], "ROOM_FULL") == 0 {
+						    //Send to client that the room is full
 							log.Printf("Player %s is unable to join Room %s. The room is currently full. Send to client Room Full.\n", command[1], command[2])
 							err = clientConn.WriteMessage(1, []byte("Error:Room Full"))
 							if err != nil {
@@ -335,8 +349,8 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								//we don't care here if client disconnected, bye bye
 								keepServicing = false
 							}
-
 						} else if strings.Compare(join_response_command[0], "USER_IN_ANOTHER_ROOM_ERROR") == 0 {
+						    //Send to client that the username is part of another room
 							log.Printf("User trying to join is already in another room. Send to client with IP address : %s, Error:User in another room already.\n", clientConn.RemoteAddr())
 							err = clientConn.WriteMessage(1, []byte("Error:User in another room already."))
 							if err != nil {
@@ -345,6 +359,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								keepServicing = false
 							}
 						} else if strings.Compare(join_response_command[0], "GAME_UNDERWAY") == 0 {
+						    //User tried to connect while a game is ongoing, send error message.
 							err = clientConn.WriteMessage(1, []byte("Error:Game already underway. If you are trying to reconnect you need to use the same username as before."))
 							if err != nil {
 								log.Printf("Error:Game underway was not able to be transmitted to the user. Error : %s", err.Error())
@@ -352,6 +367,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								keepServicing = false
 							}
 						} else {
+						    //Unexpected response, should not happen
 							log.Printf("Unexpected response from server for Join Room. Sending to client with IP address : %s, Error:Unexpected Join Room Server Response\n", clientConn.RemoteAddr())
 							err = clientConn.WriteMessage(1, []byte("Error:Unexpected Join Room Server Response"))
 							if err != nil {
@@ -361,6 +377,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							}
 						}
 					}
+                    service_completed = true
 				} else {
 					//Room doesn't exist, send error, this will likely happen if data gets corrupt, highly unlikely
 					log.Printf("Room with access Code %s doesn't exists. Join Non Existent Room Error was sent to the client.\n", command[2])
@@ -377,8 +394,10 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				log.Printf("Answer Room Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 				gameRoomMutex.Lock()
 				log.Printf("Inside Answer Room Mutex.")
+				//Check if game Room exists
 				var _, ok = gameRooms[command[2]]
 				if ok {
+				    //send command to server
 					log.Printf("Sending Command Answer : %s", string(buffer[:n]))
 					_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
 					if err != nil {
@@ -391,8 +410,10 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						//Setting Deadline to test
 						//timeoutDuration := 1 * time.Second
 						//gameRoomConn.SetReadDeadline(time.Now().Add(timeoutDuration))
+						//Potential Race Condition, need timestamps
 						nResponse, err = gameRooms[command[2]].gameRoomConn.Read(serverResponseBuffer)
 						if err != nil {
+						    //failed to receive response from server, find new server
 							log.Printf("Proxy was unable to receive a response from the server. Error : %s.\n", err.Error())
 							gameRoomConn = restartServer()
 							gameRoomMutex.Unlock()
@@ -400,6 +421,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							continue
 						} else {
 							//Remember we need to start informing about disconnections
+							//Successfully received response from server for answer question
 							answer_response := string(serverResponseBuffer[:nResponse])
 							log.Printf("Server Responded : %s.\n", answer_response)
 							var answer_command = strings.Split(string(serverResponseBuffer[:nResponse]), ":")
@@ -407,39 +429,45 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								//First we need to handle the client that responded
 								err = clientConn.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
 								if err != nil {
+								    //was unable to send message to client that sent the game request/
+								    //Will handle disconnection in next iteration of the for loop
 									log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", command[1], clientConn.RemoteAddr(), err.Error())
 									disconnect = true
 								} else {
+								    //Successfully sent the message to the user that sent the request
 									log.Printf("Sent Everyone Responded to player %s with IP address %s. This player made the last response\n", command[1], clientConn.RemoteAddr())
 								}
-								//we need to check and see if this is the last player that was playing and if he disconnected
+								//Do we have more than 1 active players in the room? If yes we need to inform them that everyone answered
+								//the question for them to see the next question of the room
 								if len(gameRooms[command[2]].players) > 1 {
+								    //iterate through the list of active websocket connections
 									for key, value := range gameRooms[command[2]].players {
 										if strings.Compare(key, command[1]) != 0 {
+										    //if this player is not the one that is performing the request, send to them the information required to see the next question.
 											err = value.WriteMessage(1, serverResponseBuffer[:nResponse])
 											if err != nil {
+											    //Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
 												log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr(), err.Error())
-												//Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
 											} else {
+											    //Successful informing of player in the game Room.
 												log.Printf("Sent Everyone Responded to player %s with IP address %s.\n", key, value.RemoteAddr())
 											}
 										}
 									}
 								}
-								//we check to see if there are other players in the room. This ensures if there was a disconnection and it wasn't the last
-								//disconnected in the room the message is sent to everyone
 							} else if strings.Compare(answer_command[0], "Game Over") == 0 {
-								//Let's inform the person that made this request
+								//Last Question was answered according to the server, Let's send this response to the player
+								//that performed this request
 								err = clientConn.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
 								if err != nil {
+                                    //Game is over, it doesn't matter if the player disconnected
 									log.Printf("There was an issue while sending Game Over message to the client with IP address : %s. Error : %s. \n", clientConn.RemoteAddr(), err.Error())
-									//Game is over, it doesn't matter if the player disconnected
-									//bye bye
 								} else {
+								    //Successfully sent the information to the player that made this request
 									log.Printf("Sent Game Over to player %s.\n", command[1])
 								}
-								// Send game over request to all other participants
-								if len(gameRooms[command[2]].players) > 0 {
+								//If there is more than 1 active participant, we need to also inform them, that the game is over
+								if len(gameRooms[command[2]].players) > 1 {
 									for key, value := range gameRooms[command[2]].players {
 										if strings.Compare(key, command[1]) != 0 {
 											err = value.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
@@ -454,44 +482,54 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 									//Need to check with Jason and see if we need to delete the individual players
 								}
 								log.Printf("The game is over for game Room %s, communications for this room will stop.\n", command[2])
+								// Terminate all the websocket connections
 								for _, value := range gameRooms[command[2]].players {
 									value.Close()
 								}
+								// Terminating the tcp communications
 								gameRooms[command[2]].gameRoomConn.Close()
 								delete(gameRooms, command[2])
 								gameRoomMutex.Unlock()
 								break
 							} else {
-								//no action here. we could use for leaderboard information during the game if needed
+								//no action here. THere are no other types of answers that can be received by the server.
 							}
 						}
 					}
 					service_completed = true
 				} else {
+				    //Invalid Accesscode provided -> potential data corruption
 					log.Printf("Invalid Answer Access to the game.\n")
 					keepServicing = false
 				}
 				gameRoomMutex.Unlock()
 			} else if strings.Compare(command[0], "Ready") == 0 {
+			    //Setting Deadline to test
+                //timeoutDuration := 1 * time.Second
+                //gameRoomConn.SetReadDeadline(time.Now().Add(timeoutDuration))
+
 				//Ready to start request from client let's work Ready:Username:AccessCode
 				log.Printf("Ready Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 				gameRoomMutex.Lock()
 				//we need to contact the game server, send the command
 				log.Printf("Requesting from Server with address %s a Ready Request.\n", gameRooms[command[2]].gameRoomConn.RemoteAddr().String())
+				// Checking for
 				_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
 				if err != nil {
+				    //Server Replication: Failure to send the command to the server, find another server
 					log.Printf("Sending Ready Command %s to the server of game Room %s failed.\n", request, command[2])
-					//Server Replication handling
+					gameRoomConn = restartServer()
+                    gameRoomMutex.Unlock()
+                    service_completed = false // For the current command to repeat
+                    continue
 				}
 				nResponse, err = gameRooms[command[2]].gameRoomConn.Read(serverResponseBuffer)
 				if err != nil {
-					//Server replication to be handled next
-					log.Printf("Receiving Response from Server for Ready Failed. Send Server Response Error to client.\n")
-					err = clientConn.WriteMessage(1, []byte("Error:Server Failed to Respond"))
-					if err != nil {
-						log.Printf("Server Response Error was not sent to the client with IP Address %s. Error : %s.\n", clientConn.RemoteAddr(), err.Error())
-						//handle, client disconnected?
-					}
+                    log.Printf("Receiving Response from Server for Ready Failed. Send Server Response Error to client.")
+                    gameRoomConn = restartServer()
+                    gameRoomMutex.Unlock()
+                    service_completed = false // For the current command to repeat
+                    continue
 				} else {
 					ready_response := string(serverResponseBuffer[:nResponse])
 					var command = strings.Split(string(buffer[:n]), ":")
@@ -502,12 +540,6 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						clientConn.WriteMessage(1, []byte(string(serverResponseBuffer[:nResponse])))
 						if err != nil {
 							log.Printf("There was an issue while sending Ready Success to Player %s with IP address : %s. Error : %s. \n", command[1], clientConn.RemoteAddr(), err.Error())
-							/*
-								disconnectServerInform(gameRooms[command[2]].gameRoomConn, command[1], command[2])
-								//we might have to close the connection here!! -> test
-								//remove player from local hashmap of the gameRoom connection
-								delete(gameRooms[command[2]].players, command[1])
-								keepServicing = false */
 							disconnect = true
 							gameRoomMutex.Unlock()
 							continue
@@ -530,14 +562,8 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						//Weren't able to send response to player that initiated the request
 						if err != nil {
 							log.Printf("There was an issue while sending All Ready acknowledgment to player %s with IP address : %s. Error : %s. \n", command[1], clientConn.RemoteAddr(), err.Error())
-							/*
-								disconnectServerInform(gameRooms[command[2]].gameRoomConn, command[1], command[2])
-								//we might have to close the connection here!! -> test
-								//remove player from local hashmap of the gameRoom connection
-								delete(gameRooms[command[2]].players, command[1])
-								keepServicing = false */
 							disconnect = true
-							if len(gameRooms[command[2]].players) > 0 {
+							if len(gameRooms[command[2]].players) > 1 {
 								//if there are more players it must be the case that they are all ready to play!
 								for key, value := range gameRooms[command[2]].players {
 									err = value.WriteMessage(1, []byte(string(serverResponseBuffer[:nResponse])))
@@ -549,6 +575,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 									}
 								}
 							} else {
+							    //don't think we need check back later
 								//we need to shut the gameRoom Connection once we figure out the server logic
 							}
 						} else {
@@ -567,6 +594,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							}
 						}
 					} else {
+					    //doesn't matter won't occur. Test later
 						log.Printf("The server sent the following response : %s\n", ready_response)
 						err = clientConn.WriteMessage(1, []byte("Error:"+ready_response))
 						if err != nil {
@@ -575,6 +603,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						}
 					}
 				}
+				service_completed = true
 				gameRoomMutex.Unlock()
 			} else {
 				//This is unlikely to happen. We should do some more testing, the trivia browser won't send a request that we don't have available
@@ -585,6 +614,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 					keepServicing = false
 				}
 			}
+			service_completed = true
 		} else {
 			//Cannot Service request, authentication information missing, this is also unlikely to happen-> do some testing! - Probably if we have an illegal attempt
 			//of connection, i.e., from a non trivia browser.

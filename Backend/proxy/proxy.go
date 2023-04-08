@@ -111,7 +111,6 @@ func restartServer() *net.TCPConn {
 				}
 				gameRooms[key].gameRoomConn = gameRoomConn
 				log.Printf("Successfully Reconnected game Room %s to server with addres %s.", key, gameRooms[key].gameRoomConn.RemoteAddr())
-				
 			}
 		}
 	} else {
