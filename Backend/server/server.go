@@ -59,14 +59,14 @@ var (
 	gameRooms      = make(map[string]*gameRoom)
 )
 
-var proxy_ip_address = "10.0.0.2"
+var proxy_ip_address = "10.0.0.105"
 var MAX_PLAYERS = 4
 var MAX_ROUNDS = 10
 var PROXY = connection{proxy_ip_address, "9000", "tcp"}
 var GAME_SERVICE = connection{proxy_ip_address, "8082", "tcp"}
 var SERVER_LISTENER = connection{proxy_ip_address, "7000", "tcp"}
-var DB_master = connection{"10.0.0.2", "4406", "tcp"}
-var DB_slave = connection{"10.0.0.2", "5506", "tcp"}
+var DB_master = connection{"68.146.50.113", "4406", "tcp"}
+var DB_slave = connection{"68.146.50.113", "5506", "tcp"}
 var db_master_user = "root"
 var db_master_pw = "password"
 var db_slave_user = "root"
@@ -114,24 +114,25 @@ func main() {
 			//If we can't resolve address there is not much we can do on the server side. Might as well just shut er' down.s
 			os.Exit(1)
 		}
-		err = fetchRooms(db)
-		if err != nil {
-			log.Printf("There was an error while fetching the game Rooms. Error : %s.\n", err.Error())
-		} else {
-			if len(gameRooms) > 0 {
-				for key, _ := range gameRooms {
-					err = fetchRoomUsers(db, key)
-					if err != nil {
-						log.Printf("There was an error while fetching the players participating in game room %s. Error : %s.\n", key, err.Error())
-					}
-					err = fetchRoomQuestions(db, key)
-					if err != nil {
-						log.Printf("There was an error while fetching the game room Questions. Error : %s.\n", err.Error())
-					}
-				}
-			}
-		}
-		log.Printf("Successfully loaded game State")
+		//err = fetchRooms(db)
+		//Might not need this
+		//if err != nil {
+		//	log.Printf("There was an error while fetching the game Rooms. Error : %s.\n", err.Error())
+		//} else {
+		//	if len(gameRooms) > 0 {
+		//		for key, _ := range gameRooms {
+		//			err = fetchRoomUsers(db, key)
+		//			if err != nil {
+		//				log.Printf("There was an error while fetching the players participating in game room %s. Error : %s.\n", key, err.Error())
+		//			}
+		//			err = fetchRoomQuestions(db, key)
+		//			if err != nil {
+		//				log.Printf("There was an error while fetching the game room Questions. Error : %s.\n", err.Error())
+		//			}
+		//		}
+		//	}
+		//}
+		//log.Printf("Successfully loaded game State")
 		// Start TCP Listener for game Connections
 		listener, err := net.ListenTCP("tcp", gameServiceTCPAddr)
 		if err != nil {

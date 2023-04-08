@@ -44,7 +44,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			player, queryErr := fetchRoomUser(db, command[1])
 			if player != nil {
 				log.Printf("Error while creating room. USER_IN_ROOM_ALREADY_ERROR.\n")
-				conn.Write([]byte("USER_IN_ROOM_ALREADY_ERROR"))
+				_, err = conn.Write([]byte("USER_IN_ROOM_ALREADY_ERROR"))
 				if err != nil {
 					log.Printf("Failed to send USER_IN_ROOM_ALREADY_ERROR. %s\n", err.Error())
 				}
@@ -462,24 +462,26 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				}
 			}
 			gameRoomsMutex.Unlock()
-		} else if strings.Compare(command[0], "Load Game State") == 0 {
-			err = fetchRooms(db)
+		} else if strings.Compare(command[0], "Restart Room Connection") == 0 {
+			//Command Format : Restart Room Connection:accessCode
+			//lock the mutex
+			accessCode = command[1]
+			gameRoomsMutex.Lock()
+			err = fetchRoom(db, command[1])
 			if err != nil {
-				log.Printf("There was an error while fetching the game Rooms. Error : %s.\n", err.Error())
+				log.Printf("There was an error while fetching the game Rooms. Error : %s.", err.Error())
 			} else {
-				if len(gameRooms) > 0 {
-					for key, _ := range gameRooms {
-						err = fetchRoomUsers(db, key)
-						if err != nil {
-							log.Printf("There was an error while fetching the players participating in game room %s. Error : %s.\n", key, err.Error())
-						}
-						err = fetchRoomQuestions(db, accessCode)
-						if err != nil {
-							log.Printf("There was an error while fetching the game room Questions. Error : %s.\n", err.Error())
-						}
-					}
+				err = fetchRoomUsers(db, command[1])
+				if err != nil {
+					log.Printf("There was an error while fetching the players participating in game room %s. Error : %s.\n", accessCode, err.Error())
+				}
+				err = fetchRoomQuestions(db, command[1])
+				if err != nil {
+					log.Printf("There was an error while fetching the game room Questions. Error : %s.\n", err.Error())
 				}
 			}
+			// Unlock the mutex
+			gameRoomsMutex.Unlock()
 		} else {
 			log.Println("Invalid Option Given by the proxy.")
 		}
