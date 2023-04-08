@@ -59,14 +59,14 @@ var (
 	gameRooms      = make(map[string]*gameRoom)
 )
 
-var proxy_ip_address = "10.0.0.105"
+var proxy_ip_address = "10.0.0.2"
 var MAX_PLAYERS = 4
 var MAX_ROUNDS = 10
 var PROXY = connection{proxy_ip_address, "9000", "tcp"}
 var GAME_SERVICE = connection{proxy_ip_address, "8082", "tcp"}
 var SERVER_LISTENER = connection{proxy_ip_address, "7000", "tcp"}
-var DB_master = connection{"68.146.50.113", "4406", "tcp"}
-var DB_slave = connection{"68.146.50.113", "5506", "tcp"}
+var DB_master = connection{"10.0.0.2", "4406", "tcp"}
+var DB_slave = connection{"10.0.0.2", "5506", "tcp"}
 var db_master_user = "root"
 var db_master_pw = "password"
 var db_slave_user = "root"

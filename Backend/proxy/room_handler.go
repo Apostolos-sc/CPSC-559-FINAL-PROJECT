@@ -153,6 +153,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 			previousCommand = string(buffer[:len(buffer)])
 			log.Printf("Previous command set as :%s", previousCommand[:n])
 			//critical access
+			serverMutex.Lock()
 			if len(serverList) == 0 {
 				//Can't service Client, no live Servers.
 				log.Println("There are no servers available to service Clients. Send Error to Client. Connection Terminated.")
@@ -160,9 +161,11 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				if err != nil {
 					log.Println("Unable to send to client Error: No Server Available:", err.Error())
 				}
+				serverMutex.Unlock()
 				keepServicing = false
 				continue
 			}
+			serverMutex.Unlock()
 			command = strings.Split(string(buffer[:n]), ":")
 			request = string(buffer[:n])
 		}
@@ -175,14 +178,18 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				address := serverList[master_server_index].host + ":" + serverList[master_server_index].port
 				if err != nil {
 					log.Printf("ResolveTCPAddr failed for %s:%v\n", address, err.Error())
-					//Need to handle the case where we can't resolve the server.
+					//what happens if can't resolve?
 				}
 				log.Printf("Create Room Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 				//attempt to connect to server to establish a game room connection using a tcp
 				gameRoomConn, err = net.DialTCP("tcp", nil, gameRoomAddr)
 				if err != nil {
+					//innaccessible server when dialing, let's load data in a secondary server
 					log.Printf("Dialing server %s for game Room Creation Request failed: %v\n", address, err.Error())
-					//Need to handle the case where we can't resolve the server
+					gameRoomConn = restartServer()
+					gameRoomMutex.Unlock()
+					service_completed = false
+					continue
 				}
 				//forward gameRoom creation request to server
 				log.Printf("Requesting from Server with address %s Game Room Creation.\n", gameRoomConn.RemoteAddr().String())
@@ -250,6 +257,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 					//Corrupt message? Or timeout handling here - figure it out later some recovery
 					log.Printf("Server Response for Command : %s was %s.\n", string(buffer[:n]), string(serverResponseBuffer[:nResponse]))
 				}
+				service_completed = true
 				gameRoomMutex.Unlock()
 			} else if strings.Compare(command[0], "Join Room") == 0 {
 				//First let's check if the room exists - Lock Critical Resource first - We need this to redirect the traffic
@@ -332,14 +340,14 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							log.Printf("User trying to join is already in another room. Send to client with IP address : %s, Error:User in another room already.\n", clientConn.RemoteAddr())
 							err = clientConn.WriteMessage(1, []byte("Error:User in another room already."))
 							if err != nil {
-								log.Printf("Error:User in another room already. was not sent to the client. Error : \n", err.Error())
+								log.Printf("Error:User in another room already. was not sent to the client. Error : %s", err.Error())
 								//we don't care about this. the username is in another room. if he disconnected bye bye
 								keepServicing = false
 							}
 						} else if strings.Compare(join_response_command[0], "GAME_UNDERWAY") == 0 {
 							err = clientConn.WriteMessage(1, []byte("Error:Game already underway. If you are trying to reconnect you need to use the same username as before."))
 							if err != nil {
-								log.Printf("Error:Game underway was not able to be transmitted to the user. Error : \n", err.Error())
+								log.Printf("Error:Game underway was not able to be transmitted to the user. Error : %s", err.Error())
 								//we don't care about this. Game is underway. if he disconnected bye bye
 								keepServicing = false
 							}
@@ -347,7 +355,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							log.Printf("Unexpected response from server for Join Room. Sending to client with IP address : %s, Error:Unexpected Join Room Server Response\n", clientConn.RemoteAddr())
 							err = clientConn.WriteMessage(1, []byte("Error:Unexpected Join Room Server Response"))
 							if err != nil {
-								log.Printf("Error:Unexpected Join Room Server Response was not sent to the client. Error : \n", err.Error())
+								log.Printf("Error:Unexpected Join Room Server Response was not sent to the client. Error : %s\n", err.Error())
 								//Assume that there was a server error, and the client didn't receive it, we don't care if client disconnected.
 								keepServicing = false
 							}
@@ -371,7 +379,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				log.Printf("Inside Answer Room Mutex.")
 				var _, ok = gameRooms[command[2]]
 				if ok {
-					log.Print("Sending Command Answer")
+					log.Printf("Sending Command Answer : %s", string(buffer[:n]))
 					_, err = gameRooms[command[2]].gameRoomConn.Write(buffer[:n])
 					if err != nil {
 						log.Printf("Sending Answer Command %s to the server of game Room %s failed.\n", request, command[2])
@@ -399,7 +407,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 								//First we need to handle the client that responded
 								err = clientConn.WriteMessage(1, []byte(serverResponseBuffer[:nResponse]))
 								if err != nil {
-									log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", clientConn.RemoteAddr(), err.Error())
+									log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", command[1], clientConn.RemoteAddr(), err.Error())
 									disconnect = true
 								} else {
 									log.Printf("Sent Everyone Responded to player %s with IP address %s. This player made the last response\n", command[1], clientConn.RemoteAddr())
@@ -410,7 +418,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 										if strings.Compare(key, command[1]) != 0 {
 											err = value.WriteMessage(1, serverResponseBuffer[:nResponse])
 											if err != nil {
-												log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, err.Error())
+												log.Printf("There was an issue while sending Everyone Responded acknowledgment to Player %s with IP address : %s. Error : %s. \n", key, value.RemoteAddr(), err.Error())
 												//Client that we are sending the everyone responded message disconnected, its own subroutine will handle this
 											} else {
 												log.Printf("Sent Everyone Responded to player %s with IP address %s.\n", key, value.RemoteAddr())
@@ -570,10 +578,10 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				gameRoomMutex.Unlock()
 			} else {
 				//This is unlikely to happen. We should do some more testing, the trivia browser won't send a request that we don't have available
-				log.Printf("Request %s has an in correct format. COMMUNICATION_PROTOCOL_ERROR will be sent to the client.\n")
+				log.Printf("Request %s has an in correct format. COMMUNICATION_PROTOCOL_ERROR will be sent to the client.\n", string(buffer[:n]))
 				err = clientConn.WriteMessage(1, []byte("Error:Invalid Command Sent"))
 				if err != nil {
-					log.Println("Sending COMMUNICATION_PROTOCOL_ERROR to client with IP address failed %s. Error : %s.", clientConn.RemoteAddr().String(), err.Error())
+					log.Printf("Sending COMMUNICATION_PROTOCOL_ERROR to client with IP address failed %s. Error : %s.", clientConn.RemoteAddr().String(), err.Error())
 					keepServicing = false
 				}
 			}
@@ -584,7 +592,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 			log.Printf("Command : %s\n", string(buffer[:n]))
 			err = clientConn.WriteMessage(1, ([]byte("Error:Invalid Communication Protocol.")))
 			if err != nil {
-				log.Println("Sending COMMUNICATION_PROTOCOL_ERROR to client with IP address %s failed. Error %s.", clientConn.RemoteAddr().String(), err.Error())
+				log.Printf("Sending COMMUNICATION_PROTOCOL_ERROR to client with IP address %s failed. Error %s.", clientConn.RemoteAddr().String(), err.Error())
 				keepServicing = false
 			}
 		}

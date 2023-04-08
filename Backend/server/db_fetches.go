@@ -32,8 +32,8 @@ func fetchRoomQuestions(db *sql.DB, accessCode string) error {
 		if err != nil {
 			log.Printf("An error occurred while fetching question with id %d. Error : %s.", i, err.Error())
 		} else {
-			gameRooms[accessCode].questions[i] = &Question{question.ID, question.question, question.answer, question.option_1, question.option_2, question.option_3, question.option_4}
-			log.Printf("Successfully assigned question with information to Game Room! : %d, %s, %s, %s, %s, %s, %s.\n", gameRooms[accessCode].questions[i].ID, gameRooms[accessCode].questions[i].question, gameRooms[accessCode].questions[i].answer, gameRooms[accessCode].questions[i].option_1, gameRooms[accessCode].questions[i].option_2, gameRooms[accessCode].questions[i].option_3, gameRooms[accessCode].questions[i].option_4)
+			gameRooms[accessCode].questions[i+1] = &Question{ID: question.ID, question: question.question, answer: question.answer, option_1: question.option_1,option_2: question.option_2,option_3: question.option_3, option_4: question.option_4}
+			log.Printf("Successfully assigned question with information to Game Room! : %d, %s, %s, %s, %s, %s, %s.\n", gameRooms[accessCode].questions[i+1].ID, gameRooms[accessCode].questions[i+1].question, gameRooms[accessCode].questions[i+1].answer, gameRooms[accessCode].questions[i+1].option_1, gameRooms[accessCode].questions[i+1].option_2, gameRooms[accessCode].questions[i+1].option_3, gameRooms[accessCode].questions[i+1].option_4)
 		}
 	}
 	return nil

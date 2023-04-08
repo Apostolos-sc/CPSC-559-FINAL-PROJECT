@@ -150,7 +150,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 									log.Printf("Successful sent JOIN_SUCCESS to user : %s\n", command[1])
 								}
 							} else {
-								log.Printf("Game is underway, user %s cannot join room.\n", command[1], command[2])
+								log.Printf("Game is underway, user %s cannot join room %s.\n", command[1], command[2])
 								_, err = conn.Write([]byte("GAME_UNDERWAY"))
 								if err != nil {
 									log.Printf("There was an error while sending GAME_UNDERWAY to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
@@ -180,7 +180,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			gameRooms[command[2]].players[command[1]].ready = 1
 			queryErr := updateRoomUser(db, gameRooms[command[2]].players[command[1]])
 			if queryErr != nil {
-				log.Printf("There was an error while updating the user in the db.\n", queryErr.Error())
+				log.Printf("There was an error while updating the user in the db.Error : %s", queryErr.Error())
 				_, err = conn.Write([]byte("READY_USER_DB_UPDATE_ERROR"))
 				if err != nil {
 					log.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
@@ -473,13 +473,18 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			} else {
 				err = fetchRoomUsers(db, command[1])
 				if err != nil {
-					log.Printf("There was an error while fetching the players participating in game room %s. Error : %s.\n", accessCode, err.Error())
+					log.Printf("There was an error while fetching the players participating in game room %s. Error : %s.", accessCode, err.Error())
 				}
 				err = fetchRoomQuestions(db, command[1])
 				if err != nil {
-					log.Printf("There was an error while fetching the game room Questions. Error : %s.\n", err.Error())
+					log.Printf("There was an error while fetching the game room Questions. Error : %s.", err.Error())
+				}
+				_, err = conn.Write([]byte("Successfully Loaded Previous Game & User Information."))
+				if err != nil {
+					log.Printf("Failed to send Successfully Loaded Previous Game & User Information. Error : %s", err.Error())
 				}
 			}
+
 			// Unlock the mutex
 			gameRoomsMutex.Unlock()
 		} else {

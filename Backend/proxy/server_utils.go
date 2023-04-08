@@ -11,7 +11,7 @@ func disconnectServerInform(roomConnection net.Conn, username string, accessCode
 	log.Printf("User %s, is trying to disconnect from room %s", username, accessCode)
 	_, err := roomConnection.Write([]byte("Disconnect:" + username + ":" + accessCode))
 	if err != nil {
-		log.Printf("Sending Disconnect information to the server Discconect:%s:%s to server %s failed. Error : %s\n", roomConnection.RemoteAddr().String(), err.Error())
+		log.Printf("Sending the following Disconnect information to the server \"Discconect:%s:%s to server\" %s failed. Error : %s\n", username, accessCode, roomConnection.RemoteAddr().String(), err.Error())
 		//handle error -> server crashed, need to switch servers
 	}
 }
@@ -31,7 +31,7 @@ func handleServerRegistration(conn net.Conn) {
 		//Client attempting to connect is a server
 		host, port, err := net.SplitHostPort(conn.RemoteAddr().String())
 		if err != nil {
-			log.Println("There was an error while splitting the remote Address of server. Error : %s.\n", err.Error())
+			log.Printf("There was an error while splitting the remote Address of server. Error : %s.", err.Error())
 		}
 		//lock the servers_slice variable
 
