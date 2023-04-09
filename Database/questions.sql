@@ -21,7 +21,7 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- Position to start replication or point-in-time recovery from
 --
 
--- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000003', MASTER_LOG_POS=313839;
+-- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000003', MASTER_LOG_POS=313903;
 
 --
 -- Current Database: `mysql`
@@ -128,7 +128,7 @@ CREATE TABLE `engine_cost` (
 
 LOCK TABLES `engine_cost` WRITE;
 /*!40000 ALTER TABLE `engine_cost` DISABLE KEYS */;
-INSERT INTO `engine_cost` VALUES ('default',0,'io_block_read_cost',NULL,'2023-04-09 05:18:48',NULL),('default',0,'memory_block_read_cost',NULL,'2023-04-09 05:18:48',NULL);
+INSERT INTO `engine_cost` VALUES ('default',0,'io_block_read_cost',NULL,'2023-04-09 06:30:09',NULL),('default',0,'memory_block_read_cost',NULL,'2023-04-09 06:30:09',NULL);
 /*!40000 ALTER TABLE `engine_cost` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -345,7 +345,7 @@ CREATE TABLE `innodb_index_stats` (
 
 LOCK TABLES `innodb_index_stats` WRITE;
 /*!40000 ALTER TABLE `innodb_index_stats` DISABLE KEYS */;
-INSERT INTO `innodb_index_stats` VALUES ('mydb','gameRoom','PRIMARY','2023-04-09 05:20:15','n_diff_pfx01',0,1,'accessCode'),('mydb','gameRoom','PRIMARY','2023-04-09 05:20:15','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','gameRoom','PRIMARY','2023-04-09 05:20:15','size',1,NULL,'Number of pages in the index'),('mydb','questions','PRIMARY','2023-04-09 05:20:25','n_diff_pfx01',1452,20,'question_id'),('mydb','questions','PRIMARY','2023-04-09 05:20:25','n_leaf_pages',23,NULL,'Number of leaf pages in the index'),('mydb','questions','PRIMARY','2023-04-09 05:20:25','size',24,NULL,'Number of pages in the index'),('mydb','roomQuestions','PRIMARY','2023-04-09 05:20:15','n_diff_pfx01',0,1,'accessCode'),('mydb','roomQuestions','PRIMARY','2023-04-09 05:20:15','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','roomQuestions','PRIMARY','2023-04-09 05:20:15','size',1,NULL,'Number of pages in the index'),('mydb','roomUser','PRIMARY','2023-04-09 05:20:15','n_diff_pfx01',0,1,'username'),('mydb','roomUser','PRIMARY','2023-04-09 05:20:15','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','roomUser','PRIMARY','2023-04-09 05:20:15','size',1,NULL,'Number of pages in the index'),('mysql','gtid_executed','PRIMARY','2023-04-09 05:18:48','n_diff_pfx01',0,1,'source_uuid'),('mysql','gtid_executed','PRIMARY','2023-04-09 05:18:48','n_diff_pfx02',0,1,'source_uuid,interval_start'),('mysql','gtid_executed','PRIMARY','2023-04-09 05:18:48','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mysql','gtid_executed','PRIMARY','2023-04-09 05:18:48','size',1,NULL,'Number of pages in the index'),('sys','sys_config','PRIMARY','2023-04-09 05:18:48','n_diff_pfx01',6,1,'variable'),('sys','sys_config','PRIMARY','2023-04-09 05:18:48','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('sys','sys_config','PRIMARY','2023-04-09 05:18:48','size',1,NULL,'Number of pages in the index');
+INSERT INTO `innodb_index_stats` VALUES ('mydb','gameRoom','PRIMARY','2023-04-09 06:32:48','n_diff_pfx01',0,1,'accessCode'),('mydb','gameRoom','PRIMARY','2023-04-09 06:32:48','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','gameRoom','PRIMARY','2023-04-09 06:32:48','size',1,NULL,'Number of pages in the index'),('mydb','questions','PRIMARY','2023-04-09 06:32:58','n_diff_pfx01',1452,20,'question_id'),('mydb','questions','PRIMARY','2023-04-09 06:32:58','n_leaf_pages',23,NULL,'Number of leaf pages in the index'),('mydb','questions','PRIMARY','2023-04-09 06:32:58','size',24,NULL,'Number of pages in the index'),('mydb','roomQuestions','PRIMARY','2023-04-09 06:32:48','n_diff_pfx01',0,1,'accessCode'),('mydb','roomQuestions','PRIMARY','2023-04-09 06:32:48','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','roomQuestions','PRIMARY','2023-04-09 06:32:48','size',1,NULL,'Number of pages in the index'),('mydb','roomUser','PRIMARY','2023-04-09 06:32:48','n_diff_pfx01',0,1,'username'),('mydb','roomUser','PRIMARY','2023-04-09 06:32:48','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mydb','roomUser','PRIMARY','2023-04-09 06:32:48','size',1,NULL,'Number of pages in the index'),('mysql','gtid_executed','PRIMARY','2023-04-09 06:30:09','n_diff_pfx01',0,1,'source_uuid'),('mysql','gtid_executed','PRIMARY','2023-04-09 06:30:09','n_diff_pfx02',0,1,'source_uuid,interval_start'),('mysql','gtid_executed','PRIMARY','2023-04-09 06:30:09','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mysql','gtid_executed','PRIMARY','2023-04-09 06:30:09','size',1,NULL,'Number of pages in the index'),('sys','sys_config','PRIMARY','2023-04-09 06:30:10','n_diff_pfx01',6,1,'variable'),('sys','sys_config','PRIMARY','2023-04-09 06:30:10','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('sys','sys_config','PRIMARY','2023-04-09 06:30:10','size',1,NULL,'Number of pages in the index');
 /*!40000 ALTER TABLE `innodb_index_stats` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -373,7 +373,7 @@ CREATE TABLE `innodb_table_stats` (
 
 LOCK TABLES `innodb_table_stats` WRITE;
 /*!40000 ALTER TABLE `innodb_table_stats` DISABLE KEYS */;
-INSERT INTO `innodb_table_stats` VALUES ('mydb','gameRoom','2023-04-09 05:20:15',0,1,0),('mydb','questions','2023-04-09 05:20:25',1452,24,0),('mydb','roomQuestions','2023-04-09 05:20:15',0,1,0),('mydb','roomUser','2023-04-09 05:20:15',0,1,0),('mysql','gtid_executed','2023-04-09 05:18:48',0,1,0),('sys','sys_config','2023-04-09 05:18:48',6,1,0);
+INSERT INTO `innodb_table_stats` VALUES ('mydb','gameRoom','2023-04-09 06:32:48',0,1,0),('mydb','questions','2023-04-09 06:32:58',1452,24,0),('mydb','roomQuestions','2023-04-09 06:32:48',0,1,0),('mydb','roomUser','2023-04-09 06:32:48',0,1,0),('mysql','gtid_executed','2023-04-09 06:30:09',0,1,0),('sys','sys_config','2023-04-09 06:30:10',6,1,0);
 /*!40000 ALTER TABLE `innodb_table_stats` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -556,7 +556,7 @@ CREATE TABLE `server_cost` (
 
 LOCK TABLES `server_cost` WRITE;
 /*!40000 ALTER TABLE `server_cost` DISABLE KEYS */;
-INSERT INTO `server_cost` VALUES ('disk_temptable_create_cost',NULL,'2023-04-09 05:18:48',NULL),('disk_temptable_row_cost',NULL,'2023-04-09 05:18:48',NULL),('key_compare_cost',NULL,'2023-04-09 05:18:48',NULL),('memory_temptable_create_cost',NULL,'2023-04-09 05:18:48',NULL),('memory_temptable_row_cost',NULL,'2023-04-09 05:18:48',NULL),('row_evaluate_cost',NULL,'2023-04-09 05:18:48',NULL);
+INSERT INTO `server_cost` VALUES ('disk_temptable_create_cost',NULL,'2023-04-09 06:30:09',NULL),('disk_temptable_row_cost',NULL,'2023-04-09 06:30:09',NULL),('key_compare_cost',NULL,'2023-04-09 06:30:09',NULL),('memory_temptable_create_cost',NULL,'2023-04-09 06:30:09',NULL),('memory_temptable_row_cost',NULL,'2023-04-09 06:30:09',NULL),('row_evaluate_cost',NULL,'2023-04-09 06:30:09',NULL);
 /*!40000 ALTER TABLE `server_cost` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -707,7 +707,7 @@ CREATE TABLE `tables_priv` (
 
 LOCK TABLES `tables_priv` WRITE;
 /*!40000 ALTER TABLE `tables_priv` DISABLE KEYS */;
-INSERT INTO `tables_priv` VALUES ('localhost','mysql','mysql.session','user','boot@connecting host','0000-00-00 00:00:00','Select',''),('localhost','sys','mysql.sys','sys_config','root@localhost','2023-04-09 05:18:48','Select','');
+INSERT INTO `tables_priv` VALUES ('localhost','mysql','mysql.session','user','boot@connecting host','0000-00-00 00:00:00','Select',''),('localhost','sys','mysql.sys','sys_config','root@localhost','2023-04-09 06:30:10','Select','');
 /*!40000 ALTER TABLE `tables_priv` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -899,7 +899,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
-INSERT INTO `user` VALUES ('localhost','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-04-09 05:18:52',NULL,'N'),('localhost','mysql.session','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-04-09 05:18:48',NULL,'Y'),('localhost','mysql.sys','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-04-09 05:18:48',NULL,'Y'),('%','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-04-09 05:18:52',NULL,'N'),('%','mydb_user_1','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*361111C1FC84C1135A6B3CEC2A934A5C19B8C61F','N','2023-04-09 05:18:52',NULL,'N');
+INSERT INTO `user` VALUES ('localhost','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-04-09 06:30:13',NULL,'N'),('localhost','mysql.session','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-04-09 06:30:10',NULL,'Y'),('localhost','mysql.sys','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*THISISNOTAVALIDPASSWORDTHATCANBEUSEDHERE','N','2023-04-09 06:30:10',NULL,'Y'),('%','root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19','N','2023-04-09 06:30:13',NULL,'N'),('%','mydb_user_1','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*361111C1FC84C1135A6B3CEC2A934A5C19B8C61F','N','2023-04-09 06:30:13',NULL,'N');
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -962,6 +962,7 @@ CREATE TABLE `gameRoom` (
   `numOfPlayersAnswered` int(11) NOT NULL,
   `numOfPlayersAnsweredCorrect` int(11) NOT NULL,
   `numOfDisconnectedPlayers` int(11) NOT NULL,
+  `accessCodeTimeStamp` bigint(20) DEFAULT NULL,
   `currentRoundTimeStamp` bigint(20) DEFAULT NULL,
   `numOfPlayersAnsweredTimeStamp` bigint(20) DEFAULT NULL,
   `numOfPlayersAnsweredCorrectTimeStamp` bigint(20) DEFAULT NULL,
@@ -1055,6 +1056,7 @@ CREATE TABLE `roomUser` (
   `offline` tinyint(1) DEFAULT NULL,
   `roundAnswer` int(11) NOT NULL,
   `correctAnswer` tinyint(1) DEFAULT NULL,
+  `accessCodeTimeStamp` bigint(20) DEFAULT NULL,
   `pointsTimeStamp` bigint(20) DEFAULT NULL,
   `readyTimeStamp` bigint(20) DEFAULT NULL,
   `offlineTimeStamp` bigint(20) DEFAULT NULL,
@@ -1077,7 +1079,7 @@ UNLOCK TABLES;
 -- GTID state at the end of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED='0206af01-d696-11ed-b0d4-0242ac150002:1-13';
+SET @@GLOBAL.GTID_PURGED='f9c482d8-d69f-11ed-8859-0242ac170002:1-13';
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -1088,4 +1090,4 @@ SET @@GLOBAL.GTID_PURGED='0206af01-d696-11ed-b0d4-0242ac150002:1-13';
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-04-09  5:22:27
+-- Dump completed on 2023-04-09  6:36:53
