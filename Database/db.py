@@ -66,7 +66,11 @@ CREATE TABLE IF NOT EXISTS gameRoom (
     currentRound INT NOT NULL,
     numOfPlayersAnswered INT NOT NULL,
     numOfPlayersAnsweredCorrect INT NOT NULL,
-    numOfDisconnectedPlayers INT NOT NULL
+    numOfDisconnectedPlayers INT NOT NULL,
+    currentRoundTimeStamp BIGINT,
+    numOfPlayersAnsweredTimeStamp BIGINT,
+    numOfPlayersAnsweredCorrectTimeStamp BIGINT,
+    numOfDisconnectedPlayersTimeStamp BIGINT
 );'''.format(table_name)
 execute_query(connection, create_gameRoom_table)
 table_name = 'roomQuestions'
@@ -95,7 +99,12 @@ CREATE TABLE IF NOT EXISTS roomUser (
     ready TINYINT (1),
     offline TINYINT (1),
     roundAnswer INT NOT NULL,
-    correctAnswer TINYINT (1)
+    correctAnswer TINYINT (1),
+    pointsTimeStamp BIGINT,
+    readyTimeStamp BIGINT,
+    offlineTimeStamp BIGINT,
+    roundAnswerTimeStamp BIGINT,
+    correctAnswerTimeStamp BIGINT
 );'''.format(table_name)
 execute_query(connection, create_roomUser_table)
 
