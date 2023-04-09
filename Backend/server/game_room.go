@@ -32,10 +32,12 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 		//we should make sure the Protocol is enforced. There is some if statements missing here in each option
 		var command = strings.Split(string(requestBuffer[:nRequest]), ":")
 		var request = string(requestBuffer[:nRequest])
+		var time_stamp int64
 		log.Printf("Client Request: %s\n", request)
 		//If message received is create room, send game Room Access Code
 		if strings.Compare(command[0], "Create Room") == 0 {
-			//Create Room:username is the communication format
+			time_stamp = strconv.ParseInt(command[2], 10, 64)
+			//Create Room:username:TimeStamp is the communication format
 			//Create a gameRoom in the database and then keep track in memory
 			//Game Connection Attempt.
 			//Call function that generates access code
@@ -89,7 +91,8 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				}
 			}
 		} else if strings.Compare(command[0], "Join Room") == 0 {
-			//Join Room:UserName:Access Code
+			time_stamp = strconv.ParseInt(command[3], 10, 64)
+			//Join Room:UserName:Access Code:TimeStamp
 			//First check the game hashmap for the player
 			gameRoomsMutex.Lock()
 			//check if the player is part of the room already and also offline
@@ -169,6 +172,8 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			}
 			gameRoomsMutex.Unlock()
 		} else if strings.Compare(command[0], "Ready") == 0 {
+			//format should be of Ready:Username:AccessCode:Response:TimeStamp
+			time_stamp = strconv.ParseInt(command[3], 10, 64)
 			//update locally and in the database
 			gameRoomsMutex.Lock()
 			//since the map is loaded upon server promotion to Master, if the value is one, we don't need to update it
@@ -244,7 +249,8 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
             }
 			gameRoomsMutex.Unlock()
 		} else if strings.Compare(command[0], "Answer") == 0 {
-			//format should be of Answer:Username:AccessCode:Response
+			time_stamp = strconv.ParseInt(command[4], 10, 64)
+			//format should be of Answer:Username:AccessCode:Response:TimeStamp
 			var correct_answer = false
 			gameRoomsMutex.Lock()
 			log.Printf("Player answered : %s.\n", command[3])
@@ -327,145 +333,174 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			gameRoomsMutex.Unlock()
 			// Need to test for disconnection after the question is answered
 		} else if strings.Compare(command[0], "Disconnect") == 0 {
-			//Disconnect:Username:AccessCode
+			time_stamp = strconv.ParseInt(command[3], 10, 64)
+			//Disconnect:Username:AccessCode:TimeStamp
 			//Proxy informs us that the client disconnected
 			gameRoomsMutex.Lock()
-			//Check if the game is going or still in lobby
-			if gameRooms[command[2]].currentRound > 0 {
-				if len(gameRooms[command[2]].players)-gameRooms[command[2]].numOfDisconnectedPlayers-1 == 0 {
-					//Last player in the room that disconnected. Let's terminate the game, delete users from room, room questions
-					for key, _ := range gameRooms[command[2]].players {
-						deleteRoomUser(db, key)
-					}
-					deleteRoomQuestions(db, command[2])
-					deleteGameRoom(db, command[2])
-					//delete room from hashmap
-					delete(gameRooms, command[2])
-					log.Printf("Game Room : %s has stopped servicing players.\n", command[2])
-					conn.Close()
-					gameRoomsMutex.Unlock()
-					return
+			//let's check if game exists (was it deleted during a server crash?)
+			_, ok = gameRooms[command[2]]
+			if !ok {
+				log.Printf("The room was previously deleted.")
+				_, err = conn.Write([]byte("Successful Deletion of the Game Room."))
+				if err != nil {
+					log.Printf("There was an error while sending Successful Termination of game Room while underway to the proxy.")
+					//proxy replication?
 				} else {
-					gameRooms[command[2]].players[command[1]].offline = 1
-					updateRoomUser(db, gameRooms[command[2]].players[command[1]])
-					gameRooms[command[2]].numOfDisconnectedPlayers++
-					updateRoom(db, gameRooms[command[2]])
-					var all_active_players_answered = true
-					for _, value := range gameRooms[command[2]].players {
-						if value.offline == 0 {
-							if value.roundAnswer != gameRooms[command[2]].currentRound {
-								all_active_players_answered = false
-								break
-							}
-						}
-					}
-					if all_active_players_answered == true {
-						//all active players answered, let's send next round information
-						if gameRooms[command[2]].currentRound < 10 {
-							gameRooms[command[2]].currentRound++
-							updateRoom(db, gameRooms[command[2]])
-							var player_object_string = "\"leaderboard\":["
-							for key, value := range gameRooms[command[2]].players {
-								player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
-							}
-							_, err = conn.Write([]byte("Everyone Responded:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_1 + "\",\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_2 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_3 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_4 + "\"]," + player_object_string[:len(player_object_string)-1] + "]}"))
-							if err != nil {
-								log.Printf("There was an error while sending Everyone Responded to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
-							} else {
-								log.Printf("Message Everyone Responded was sent to the proxy.\n")
-							}
-							timer = time.Now()
-							gameRooms[command[2]].numOfPlayersAnswered = 0
-							gameRooms[command[2]].numOfPlayersAnsweredCorrect = 0
-							updateRoom(db, gameRooms[command[2]])
-						} else {
-							var player_object_string string = "{\"leaderboard\":["
-							for key, value := range gameRooms[command[2]].players {
-								player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
-							}
-							//We need to delete data from database
-							for key, _ := range gameRooms[command[2]].players {
-								deleteRoomUser(db, key)
-							}
-							deleteGameRoom(db, command[2])
-							deleteRoomQuestions(db, command[2])
-							_, err = conn.Write([]byte("Game Over:" + player_object_string[:len(player_object_string)-1] + "]" + "}"))
-							if err != nil {
-								log.Printf("There was an error while sending Game Over to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
-								//proxy replication?
-							} else {
-								log.Printf("Message Game over:%s]} was sent to the proxy.\n", player_object_string[:len(player_object_string)-1])
-							}
-							log.Printf("Game Room %s communications will be terminated.\n", command[2])
-							conn.Close()
-							gameRoomsMutex.Unlock()
-							break //Break out of the for loop
-						}
-					} else {
-						_, err = conn.Write([]byte("Game Disconnect:" + command[1]))
-						if err != nil {
-							log.Printf("There was an error while sending Lobby Disconnect:%s to proxy. Game Room: %s, Error: %s\n", command[1], command[2], err.Error())
-						} else {
-							log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
-						}
-					}
-					//need to check these queries in case db flops
+					log.Printf("Successfully sent to proxy Successful Termination of Game Room.")
 				}
 			} else {
-				log.Printf("Game has not started yet while user %s disconnected from room %s.\n", command[1], command[2])
-				//Last player in the room that disconnected. Let's delete the room, delete users from room, and delete room questions
-				if len(gameRooms[command[2]].players) == 1 {
-					log.Printf("There is only one user in the room, let's delete him and his room.")
-					//only one player in the room, delete the player
-					deleteRoomUser(db, command[1])
-					deleteRoomQuestions(db, command[2])
-					deleteGameRoom(db, command[2])
-					delete(gameRooms[command[2]].players, command[1])
-					delete(gameRooms, command[2])
-					gameRoomsMutex.Unlock()
-					log.Printf("Game Room : %s has stopped servicing players.\n", command[2])
-					conn.Close()
-					return
-				} else {
-					log.Printf("There are more than one user in the room : %s\n", command[2])
-					//delete the User
-					deleteRoomUser(db, command[1])
-					delete(gameRooms[command[2]].players, command[1])
-					var allPlayersReady = true
-					for key, value := range gameRooms[command[2]].players {
-						if value.offline != 1 {
-							if value.ready != 1 {
-								allPlayersReady = false
-								log.Printf("Player %s is not ready to start after player disconnection.\n", key)
-							} else {
-								log.Printf("Player %s is ready to start after player disconnection.\n", key)
+				//Check if the game is going or still in lobby
+				if gameRooms[command[2]].currentRound > 0 && gameRooms[command[2]].currentRoundTimeStamp != time_stamp {
+					if gameRooms[command[2]].numOfDisconnectedPlayersTimeStamp != time_stamp {
+
+					}
+					if len(gameRooms[command[2]].players)-gameRooms[command[2]].numOfDisconnectedPlayers-1 == 0 {
+						//Last player in the room that disconnected. Let's terminate the game, delete users from room, room questions
+						deleteRoomUsers(db, command[2])
+						deleteRoomQuestions(db, command[2])
+						deleteGameRoom(db, command[2])
+						//delete room from hashmap
+						delete(gameRooms, command[2])
+						_, err = conn.Write([]byte("Successful Termination of Game Room while underway."))
+						if err != nil {
+							log.Printf("There was an error while sending Successful Termination of game Room while underway to the proxy.")
+							//proxy replication?
+						} else {
+							log.Printf("Successfully sent to proxy Successful Termination of Game Room while underway.")
+						}
+						log.Printf("Game Room : %s has stopped servicing players.\n", command[2])
+						conn.Close()
+						gameRoomsMutex.Unlock()
+						return
+					} else {
+						gameRooms[command[2]].players[command[1]].offline = 1
+						updateRoomUser(db, gameRooms[command[2]].players[command[1]])
+						gameRooms[command[2]].numOfDisconnectedPlayers++
+						updateRoom(db, gameRooms[command[2]])
+						var all_active_players_answered = true
+						for _, value := range gameRooms[command[2]].players {
+							if value.offline == 0 {
+								if value.roundAnswer != gameRooms[command[2]].currentRound {
+									all_active_players_answered = false
+									break
+								}
 							}
 						}
+						if all_active_players_answered == true {
+							//all active players answered, let's send next round information
+							if gameRooms[command[2]].currentRound < 10 {
+								gameRooms[command[2]].currentRound++
+								updateRoom(db, gameRooms[command[2]])
+								var player_object_string = "\"leaderboard\":["
+								for key, value := range gameRooms[command[2]].players {
+									player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
+								}
+								_, err = conn.Write([]byte("Everyone Responded:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_1 + "\",\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_2 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_3 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_4 + "\"]," + player_object_string[:len(player_object_string)-1] + "]}"))
+								if err != nil {
+									log.Printf("There was an error while sending Everyone Responded to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+								} else {
+									log.Printf("Message Everyone Responded was sent to the proxy.\n")
+								}
+								timer = time.Now()
+								gameRooms[command[2]].numOfPlayersAnswered = 0
+								gameRooms[command[2]].numOfPlayersAnsweredCorrect = 0
+								updateRoom(db, gameRooms[command[2]])
+							} else {
+								var player_object_string string = "{\"leaderboard\":["
+								for key, value := range gameRooms[command[2]].players {
+									player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
+								}
+								//We need to delete data from database
+								for key, _ := range gameRooms[command[2]].players {
+									deleteRoomUser(db, key)
+								}
+								deleteGameRoom(db, command[2])
+								deleteRoomQuestions(db, command[2])
+								_, err = conn.Write([]byte("Game Over:" + player_object_string[:len(player_object_string)-1] + "]" + "}"))
+								if err != nil {
+									log.Printf("There was an error while sending Game Over to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+									//proxy replication?
+								} else {
+									log.Printf("Message Game over:%s]} was sent to the proxy.\n", player_object_string[:len(player_object_string)-1])
+								}
+								log.Printf("Game Room %s communications will be terminated.\n", command[2])
+								conn.Close()
+								gameRoomsMutex.Unlock()
+								break //Break out of the for loop
+							}
+						} else {
+							_, err = conn.Write([]byte("Game Disconnect:" + command[1]))
+							if err != nil {
+								log.Printf("There was an error while sending Lobby Disconnect:%s to proxy. Game Room: %s, Error: %s\n", command[1], command[2], err.Error())
+							} else {
+								log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
+							}
+						}
+						//need to check these queries in case db flops
 					}
-					if allPlayersReady {
-						//All players ready, start the game
-						gameRooms[command[2]].currentRound = 1
-						updateRoom(db, gameRooms[command[2]])
-						ok := generateQuestions(db, command[2])
-						if ok {
-							log.Printf("Successful generation of random questions for game room : %s.\n", accessCode)
-						} else {
-							log.Printf("Failed to generate random questions for game room : %s.\n", accessCode)
-						}
-						_, err = conn.Write([]byte("All Ready:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[1].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[1].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[1].option_1 + "\",\"" + gameRooms[command[2]].questions[1].option_2 + "\", \"" + gameRooms[command[2]].questions[1].option_3 + "\", \"" + gameRooms[command[2]].questions[1].option_4 + "\"]}"))
+				} else {
+					log.Printf("Game has not started yet while user %s disconnected from room %s.\n", command[1], command[2])
+					//Last player in the room that disconnected. Let's delete the room, delete users from room, and delete room questions
+					if len(gameRooms[command[2]].players) == 1 {
+						log.Printf("There is only one user in the room, let's delete him and his room.")
+						//only one player in the room, delete the player
+						deleteRoomUser(db, command[1])
+						deleteRoomQuestions(db, command[2])
+						deleteGameRoom(db, command[2])
+						delete(gameRooms[command[2]].players, command[1])
+						delete(gameRooms, command[2])
+						gameRoomsMutex.Unlock()
+						_, err = conn.Write([]byte("Successful Termination of Game Room while in lobby."))
 						if err != nil {
-							log.Printf("There was an error while sending All Ready message to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+							log.Printf("There was an error while sending Successful Termination of game Room while in lobby to the proxy.")
+							//proxy replication?
 						} else {
-							log.Printf("Message All Ready was sent to the proxy.\n")
+							log.Printf("Successfully sent to proxy Successful Termination of Game Room while in lobby to the proxy.")
 						}
-						timer = time.Now()
+						log.Printf("Game Room : %s has stopped servicing players.\n", command[2])
+						conn.Close()
+						return
 					} else {
-						//not all players are ready, send disconnect message to proxy
-						_, err = conn.Write([]byte("Lobby Disconnect:" + command[1]))
-						if err != nil {
-							log.Printf("There was an error while sending Lobby Disconnect:%s to proxy. Game Room: %s, Error: %s\n", command[1], command[2], err.Error())
+						log.Printf("There are more than one user in the room : %s\n", command[2])
+						//delete the User
+						deleteRoomUser(db, command[1])
+						delete(gameRooms[command[2]].players, command[1])
+						var allPlayersReady = true
+						for key, value := range gameRooms[command[2]].players {
+							if value.offline != 1 {
+								if value.ready != 1 {
+									allPlayersReady = false
+									log.Printf("Player %s is not ready to start after player disconnection.\n", key)
+								} else {
+									log.Printf("Player %s is ready to start after player disconnection.\n", key)
+								}
+							}
+						}
+						if allPlayersReady {
+							//All players ready, start the game
+							gameRooms[command[2]].currentRound = 1
+							updateRoom(db, gameRooms[command[2]])
+							ok := generateQuestions(db, command[2])
+							if ok {
+								log.Printf("Successful generation of random questions for game room : %s.\n", accessCode)
+							} else {
+								log.Printf("Failed to generate random questions for game room : %s.\n", accessCode)
+							}
+							_, err = conn.Write([]byte("All Ready:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[1].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[1].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[1].option_1 + "\",\"" + gameRooms[command[2]].questions[1].option_2 + "\", \"" + gameRooms[command[2]].questions[1].option_3 + "\", \"" + gameRooms[command[2]].questions[1].option_4 + "\"]}"))
+							if err != nil {
+								log.Printf("There was an error while sending All Ready message to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+							} else {
+								log.Printf("Message All Ready was sent to the proxy.\n")
+							}
+							timer = time.Now()
 						} else {
-							log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
+							//not all players are ready, send disconnect message to proxy
+							_, err = conn.Write([]byte("Lobby Disconnect:" + command[1]))
+							if err != nil {
+								log.Printf("There was an error while sending Lobby Disconnect:%s to proxy. Game Room: %s, Error: %s\n", command[1], command[2], err.Error())
+							} else {
+								log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
+							}
 						}
 					}
 				}
