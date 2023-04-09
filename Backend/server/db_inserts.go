@@ -8,7 +8,7 @@ import (
 )
 
 func insertRoomUser(db *sql.DB, player *roomUser) error {
-	query := "INSERT INTO roomUser(username, accessCode, points, ready, offline, roundAnswer, correctAnswer, pointsTimeStamp, readyTimeStamp, offlineTimeStamp, roundAnswerTimeStamp, correctAnswerTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	query := "INSERT INTO roomUser(username, accessCode, points, ready, offline, roundAnswer, correctAnswer, accessCodeTimeStamp, pointsTimeStamp, readyTimeStamp, offlineTimeStamp, roundAnswerTimeStamp, correctAnswerTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
 	stmt, err := db.PrepareContext(ctx, query)
@@ -17,7 +17,7 @@ func insertRoomUser(db *sql.DB, player *roomUser) error {
 		return err
 	}
 	defer stmt.Close()
-	res, err := stmt.ExecContext(ctx, player.username, player.accessCode, player.points, player.ready, player.offline, player.roundAnswer, player.correctAnswer, player.pointsTimeStamp, player.readyTimeStamp, player.offlineTimeStamp, player.roundAnswerTimeStamp, player.correctAnswerTimeStamp)
+	res, err := stmt.ExecContext(ctx, player.username, player.accessCode, player.points, player.ready, player.offline, player.roundAnswer, player.correctAnswer, player.accessCodeTimeStamp, player.pointsTimeStamp, player.readyTimeStamp, player.offlineTimeStamp, player.roundAnswerTimeStamp, player.correctAnswerTimeStamp)
 	if err != nil {
 		log.Printf("Error %s when inserting row into roomUser table", err)
 		return err
@@ -27,12 +27,12 @@ func insertRoomUser(db *sql.DB, player *roomUser) error {
 		log.Printf("Error %s when finding rows affected", err)
 		return err
 	}
-	log.Printf("%d roomUser created with information %s, %s, %d, %d,  %d, %d, %d, %d, %d,  %d, %d, %d. ", rows, player.username, player.accessCode, player.points, player.ready, player.offline, player.roundAnswer, player.correctAnswer, player.pointsTimeStamp, player.readyTimeStamp, player.offlineTimeStamp, player.roundAnswerTimeStamp, player.correctAnswerTimeStamp)
+	log.Printf("%d roomUser created with information %s, %s, %d, %d,  %d, %d, %d, %d, %d, %d,  %d, %d, %d. ", rows, player.username, player.accessCode, player.points, player.ready, player.offline, player.roundAnswer, player.correctAnswer, player.accessCodeTimeStamp, player.pointsTimeStamp, player.readyTimeStamp, player.offlineTimeStamp, player.roundAnswerTimeStamp, player.correctAnswerTimeStamp)
 	return nil
 }
 
 func insertGameRoom(db *sql.DB, room *gameRoom) error {
-	query := "INSERT INTO gameRoom(accessCode, currentRound, numOfPlayersAnswered, numOfPlayersAnsweredCorrect, numOfDisconnectedPlayers, currentRoundTimeStamp, numOfPlayersAnsweredTimeStamp, numOfPlayersAnsweredCorrectTimeStamp, numOfDisconnectedPlayersTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	query := "INSERT INTO gameRoom(accessCode, currentRound, numOfPlayersAnswered, numOfPlayersAnsweredCorrect, numOfDisconnectedPlayers, accessCodeTimeStamp, currentRoundTimeStamp, numOfPlayersAnsweredTimeStamp, numOfPlayersAnsweredCorrectTimeStamp, numOfDisconnectedPlayersTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
 	stmt, err := db.PrepareContext(ctx, query)
@@ -41,7 +41,7 @@ func insertGameRoom(db *sql.DB, room *gameRoom) error {
 		return err
 	}
 	defer stmt.Close()
-	res, err := stmt.ExecContext(ctx, room.accessCode, room.currentRound, room.numOfPlayersAnswered, room.numOfPlayersAnsweredCorrect, room.numOfDisconnectedPlayers, room.currentRoundTimeStamp, room.numOfPlayersAnsweredTimeStamp, room.numOfPlayersAnsweredCorrectTimeStamp, room.numOfDisconnectedPlayersTimeStamp)
+	res, err := stmt.ExecContext(ctx, room.accessCode, room.currentRound, room.numOfPlayersAnswered, room.numOfPlayersAnsweredCorrect, room.numOfDisconnectedPlayers, room.accessCodeTimeStamp, room.currentRoundTimeStamp, room.numOfPlayersAnsweredTimeStamp, room.numOfPlayersAnsweredCorrectTimeStamp, room.numOfDisconnectedPlayersTimeStamp)
 	if err != nil {
 		log.Printf("Error %s when inserting row into gameRoom table", err)
 		return err
@@ -51,7 +51,7 @@ func insertGameRoom(db *sql.DB, room *gameRoom) error {
 		log.Printf("Error %s when finding rows affected", err)
 		return err
 	}
-	log.Printf("%d gameRoom created with information %s, %d, %d, %d, %d, %d, %d, %d, %d.\n", rows, room.accessCode, room.currentRound, room.numOfPlayersAnswered, room.numOfPlayersAnsweredCorrect, room.numOfDisconnectedPlayers, room.currentRoundTimeStamp, room.numOfPlayersAnsweredTimeStamp, room.numOfPlayersAnsweredCorrectTimeStamp, room.numOfDisconnectedPlayersTimeStamp)
+	log.Printf("%d gameRoom created with information %s, %d, %d, %d, %d, %d, %d, %d, %d, %d.\n", rows, room.accessCode, room.currentRound, room.numOfPlayersAnswered, room.numOfPlayersAnsweredCorrect, room.numOfDisconnectedPlayers, room.accessCodeTimeStamp, room.currentRoundTimeStamp, room.numOfPlayersAnsweredTimeStamp, room.numOfPlayersAnsweredCorrectTimeStamp, room.numOfDisconnectedPlayersTimeStamp)
 	return nil
 }
 

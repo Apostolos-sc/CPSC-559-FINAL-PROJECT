@@ -37,6 +37,7 @@ type roomUser struct {
 	offline       int
 	roundAnswer   int
 	correctAnswer int
+	accessCodeTimeStamp int64
 	pointsTimeStamp int64
 	readyTimeStamp int64
 	offlineTimeStamp int64
@@ -55,6 +56,7 @@ type gameRoom struct {
 	numOfPlayersAnswered        int
 	numOfPlayersAnsweredCorrect int
 	numOfDisconnectedPlayers    int
+	accessCodeTimeStamp int64
 	currentRoundTimeStamp int64
 	numOfPlayersAnsweredTimeStamp int64
 	numOfPlayersAnsweredCorrectTimeStamp int64
