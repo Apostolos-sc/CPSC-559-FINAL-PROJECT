@@ -37,6 +37,11 @@ type roomUser struct {
 	offline       int
 	roundAnswer   int
 	correctAnswer int
+	pointsTimeStamp int64
+	readyTimeStamp int64
+	offlineTimeStamp int64
+	roundAnswerTimeStamp int64
+	correctAnswerTimeStamp int64
 }
 type connection struct {
 	host     string
@@ -50,6 +55,10 @@ type gameRoom struct {
 	numOfPlayersAnswered        int
 	numOfPlayersAnsweredCorrect int
 	numOfDisconnectedPlayers    int
+	currentRoundTimeStamp int64
+	numOfPlayersAnsweredTimeStamp int64
+	numOfPlayersAnsweredCorrectTimeStamp int64
+	numOfDisconnectedPlayersTimeStamp int64
 	questions                   map[int]*Question
 	players                     map[string]*roomUser
 }
@@ -114,26 +123,6 @@ func main() {
 			//If we can't resolve address there is not much we can do on the server side. Might as well just shut er' down.s
 			os.Exit(1)
 		}
-		//err = fetchRooms(db)
-		//Might not need this
-		//if err != nil {
-		//	log.Printf("There was an error while fetching the game Rooms. Error : %s.\n", err.Error())
-		//} else {
-		//	if len(gameRooms) > 0 {
-		//		for key, _ := range gameRooms {
-		//			err = fetchRoomUsers(db, key)
-		//			if err != nil {
-		//				log.Printf("There was an error while fetching the players participating in game room %s. Error : %s.\n", key, err.Error())
-		//			}
-		//			err = fetchRoomQuestions(db, key)
-		//			if err != nil {
-		//				log.Printf("There was an error while fetching the game room Questions. Error : %s.\n", err.Error())
-		//			}
-		//		}
-		//	}
-		//}
-		//log.Printf("Successfully loaded game State")
-		// Start TCP Listener for game Connections
 		listener, err := net.ListenTCP("tcp", gameServiceTCPAddr)
 		if err != nil {
 			log.Printf("Unable to start listener - at address : %s:%s, %s", GAME_SERVICE.host, GAME_SERVICE.port, err)

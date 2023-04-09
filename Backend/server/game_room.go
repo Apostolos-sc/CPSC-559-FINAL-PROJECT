@@ -56,7 +56,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
                     //Room should be activated now
                     gameRoomsMutex.Lock()
                     //add game room to the Game Rooms map
-                    gameRooms[accessCode] = &gameRoom{accessCode: accessCode, currentRound: 0, numOfDisconnectedPlayers: 0, numOfPlayersAnsweredCorrect: 0, numOfPlayersAnswered: 0, questions: make(map[int]*Question), players: make(map[string]*roomUser)}
+                    gameRooms[accessCode] = &gameRoom{accessCode: accessCode, currentRound: 0, numOfDisconnectedPlayers: 0, numOfPlayersAnsweredCorrect: 0, numOfPlayersAnswered: 0, currentRoundTimeStamp: -1, numOfDisconnectedPlayersTimeStamp: -1, numOfPlayersAnsweredCorrectTimeStamp: -1, numOfPlayersAnsweredTimeStamp: -1, questions: make(map[int]*Question), players: make(map[string]*roomUser)}
                     queryErr := insertGameRoom(db, gameRooms[accessCode])
                     if queryErr != nil {
                         if queryErr != nil {
@@ -64,7 +64,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
                         }
                     }
                     //Add player who created the room to the hash
-                    gameRooms[accessCode].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1}
+                    gameRooms[accessCode].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1, pointsTimeStamp: -1, readyTimeStamp: -1, offlineTimeStamp: -1, roundAnswerTimeStamp: -1, correctAnswerTimeStamp: -1}
                     queryErr = insertRoomUser(db, gameRooms[accessCode].players[command[1]])
                     if queryErr != nil {
                         log.Printf("Error when inserting Room User information in the database, Command Executing : %s : %s\n", request, queryErr.Error())
@@ -109,6 +109,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				}
 				gameRooms[command[2]].numOfDisconnectedPlayers--
 				updateRoom(db, gameRooms[command[2]])
+				//Remind danny to connect to time server upon reconnection
 				conn.Write([]byte("Reconnect Success:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_1 + "\",\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_2 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_3 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_4 + "\"],\"time\":\"" + time_left + "\"}"))
 				if err != nil {
 					log.Printf("There was an error while sending Reconnect Succes to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
@@ -131,7 +132,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 						if len(gameRooms[command[2]].players) < MAX_PLAYERS {
 							if gameRooms[command[2]].currentRound == 0 {
 								//player can join, there is room, assign it in memory
-								gameRooms[command[2]].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1}
+								gameRooms[command[2]].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1, pointsTimeStamp: -1, readyTimeStamp: -1, offlineTimeStamp: -1, roundAnswerTimeStamp: -1, correctAnswerTimeStamp: -1}
 								//we need to also check for errors for the sql query
 								insertRoomUser(db, gameRooms[command[2]].players[command[1]])
 								log.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
@@ -338,15 +339,6 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					}
 					deleteRoomQuestions(db, command[2])
 					deleteGameRoom(db, command[2])
-
-					//Need to test
-
-					//for key, _ := range gameRooms[command[2]].players {
-					//	log.Printf("Deleting user %s from player hashmap for game %s", key, command[2])
-					//	//delete player from hashmap
-					//	delete(gameRooms[command[2]].players, key)
-					//}
-
 					//delete room from hashmap
 					delete(gameRooms, command[2])
 					log.Printf("Game Room : %s has stopped servicing players.\n", command[2])
@@ -380,7 +372,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 							if err != nil {
 								log.Printf("There was an error while sending Everyone Responded to Proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
 							} else {
-								log.Printf("Message Everyone Responsed was sent to the proxy.\n")
+								log.Printf("Message Everyone Responded was sent to the proxy.\n")
 							}
 							timer = time.Now()
 							gameRooms[command[2]].numOfPlayersAnswered = 0

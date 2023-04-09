@@ -55,6 +55,30 @@ func deleteRoomUser(db *sql.DB, username string) error {
 	return nil
 }
 
+func deleteRoomUsers(db *sql.DB, accessCode string) error {
+	query := "DELETE FROM roomUser WHERE accessCode = ?"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Printf("Error %s when preparing SQL statement", err.Error())
+		return err
+	}
+	defer stmt.Close()
+	res, err := stmt.ExecContext(ctx, accessCode)
+	if err != nil {
+		log.Printf("Error %s when deleting all rows of roomUser in gameRoom %s", err.Error(), accessCode)
+		return err
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		log.Printf("Error %s when finding rows affected", err.Error())
+		return err
+	}
+	log.Printf(" All Room Users of room %s was successfully deleted.", accessCode)
+	return nil
+}
+
 func deleteRoomQuestions(db *sql.DB, accessCode string) error {
 	query := "DELETE FROM roomQuestions WHERE accessCode = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
