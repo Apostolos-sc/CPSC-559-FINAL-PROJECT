@@ -30,18 +30,18 @@ type Question struct {
 
 // ready should be 0 or 1 to indicate if a player is ready to start
 type roomUser struct {
-	username      string
-	accessCode    string
-	points        int
-	ready         int
-	offline       int
-	roundAnswer   int
-	correctAnswer int
-	accessCodeTimeStamp int64
-	pointsTimeStamp int64
-	readyTimeStamp int64
-	offlineTimeStamp int64
-	roundAnswerTimeStamp int64
+	username               string
+	accessCode             string
+	points                 int
+	ready                  int
+	offline                int
+	roundAnswer            int
+	correctAnswer          int
+	accessCodeTimeStamp    int64
+	pointsTimeStamp        int64
+	readyTimeStamp         int64
+	offlineTimeStamp       int64
+	roundAnswerTimeStamp   int64
 	correctAnswerTimeStamp int64
 }
 type connection struct {
@@ -51,18 +51,18 @@ type connection struct {
 }
 
 type gameRoom struct {
-	accessCode                  string
-	currentRound                int
-	numOfPlayersAnswered        int
-	numOfPlayersAnsweredCorrect int
-	numOfDisconnectedPlayers    int
-	accessCodeTimeStamp int64
-	currentRoundTimeStamp int64
-	numOfPlayersAnsweredTimeStamp int64
+	accessCode                           string
+	currentRound                         int
+	numOfPlayersAnswered                 int
+	numOfPlayersAnsweredCorrect          int
+	numOfDisconnectedPlayers             int
+	accessCodeTimeStamp                  int64
+	currentRoundTimeStamp                int64
+	numOfPlayersAnsweredTimeStamp        int64
 	numOfPlayersAnsweredCorrectTimeStamp int64
-	numOfDisconnectedPlayersTimeStamp int64
-	questions                   map[int]*Question
-	players                     map[string]*roomUser
+	numOfDisconnectedPlayersTimeStamp    int64
+	questions                            map[int]*Question
+	players                              map[string]*roomUser
 }
 
 var (
@@ -70,19 +70,22 @@ var (
 	gameRooms      = make(map[string]*gameRoom)
 )
 
-var proxy_ip_address = "10.0.0.2"
+var proxy_ip_address = "10.0.0.8"
 var MAX_PLAYERS = 4
 var MAX_ROUNDS = 10
 var PROXY = connection{proxy_ip_address, "9000", "tcp"}
 var GAME_SERVICE = connection{proxy_ip_address, "8082", "tcp"}
 var SERVER_LISTENER = connection{proxy_ip_address, "7000", "tcp"}
-var DB_master = connection{"10.0.0.2", "4406", "tcp"}
-var DB_slave = connection{"10.0.0.2", "5506", "tcp"}
+var DB_master = connection{"10.0.0.8", "4406", "tcp"}
+var DB_slave = connection{"10.0.0.8", "5506", "tcp"}
+var TIME_SERVER_1 = connection{"10.0.0.8", "6608", "tcp"}
+var TIME_SERVER_2 = connection{"10.0.0.8", "6609", "tcp"}
 var db_master_user = "root"
 var db_master_pw = "password"
 var db_slave_user = "root"
 var db_slave_pw = "password"
 var game_points = [4]int{10, 9, 8, 7}
+var timeserver_1_conn *net.TCPConn
 
 func main() {
 	var portRead = -5
@@ -114,6 +117,10 @@ func main() {
 		}
 	}(db)
 
+	timeserver_1_conn = connectToTimeServer()
+	//log.Printf("writing test")
+	//timeserver_1_conn.Write([]byte("test"))
+	//log.Printf("done writing test")
 	//listen for other servers
 	//go listenForOtherServers(db)
 	if connectToProxy() {
@@ -225,4 +232,39 @@ func testConnection(db *sql.DB, host string, port string) bool {
 		log.Printf("Successfully accessed database at %s:%s.\n", host, port)
 		return true
 	}
+}
+
+// Returns true if the proxy accepts the connection.
+func connectToTimeServer() *net.TCPConn {
+	// connection type, IpAddres:Port
+	timeServerAddr, err := net.ResolveTCPAddr(TIME_SERVER_1.con_type, TIME_SERVER_1.host+":"+TIME_SERVER_2.port)
+	if err != nil {
+		log.Println("ResolveTCPAddr failed:", err.Error())
+		os.Exit(1)
+	}
+	// attempt to connect to proxy using a tcp connection
+	conn, err := net.DialTCP(TIME_SERVER_1.con_type, nil, timeServerAddr)
+	if err != nil {
+		log.Println("Dial failed:", err.Error())
+		os.Exit(1)
+	}
+
+	_, err = conn.Write([]byte("Server Join"))
+	if err != nil {
+		log.Println("Write data failed:", err.Error())
+		os.Exit(1)
+	}
+
+	// buffer to get data
+	received := make([]byte, 8192)
+	n, err := conn.Read(received)
+	if err != nil {
+		log.Println("Read data failed:", err.Error())
+		os.Exit(1)
+	}
+	if strings.Compare(string(received[:n]), "Accepted") == 0 {
+		//If the proxy accepted us, send the address we will be serving at
+		log.Printf("The message from time server is Accepted")
+	}
+	return conn
 }

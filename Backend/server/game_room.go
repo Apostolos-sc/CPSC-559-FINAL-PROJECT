@@ -36,7 +36,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 		log.Printf("Client Request: %s\n", request)
 		//If message received is create room, send game Room Access Code
 		if strings.Compare(command[0], "Create Room") == 0 {
-			time_stamp = strconv.ParseInt(command[2], 10, 64)
+			time_stamp, _ = strconv.ParseInt(command[2], 10, 64)
 			//Create Room:username:TimeStamp is the communication format
 			//Create a gameRoom in the database and then keep track in memory
 			//Game Connection Attempt.
@@ -55,43 +55,43 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					//username not found in the userRoom table, let's create a room.
 					accessCode = generateAccessCode()
 					//time.Sleep(8 * time.Second)
-                    //Room should be activated now
-                    gameRoomsMutex.Lock()
-                    //add game room to the Game Rooms map
-                    gameRooms[accessCode] = &gameRoom{accessCode: accessCode, currentRound: 0, numOfDisconnectedPlayers: 0, numOfPlayersAnsweredCorrect: 0, numOfPlayersAnswered: 0, accessCodeTimeStamp: -1,currentRoundTimeStamp: -1, numOfDisconnectedPlayersTimeStamp: -1, numOfPlayersAnsweredCorrectTimeStamp: -1, numOfPlayersAnsweredTimeStamp: -1, questions: make(map[int]*Question), players: make(map[string]*roomUser)}
-                    queryErr := insertGameRoom(db, gameRooms[accessCode])
-                    if queryErr != nil {
-                        if queryErr != nil {
-                            log.Printf("Error when inserting game Room information in the database, Command Executing : %s : %s\n", request, queryErr.Error())
-                        }
-                    }
-                    //Add player who created the room to the hash
-                    gameRooms[accessCode].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1, accessCodeTimeStamp: -1,pointsTimeStamp: -1, readyTimeStamp: -1, offlineTimeStamp: -1, roundAnswerTimeStamp: -1, correctAnswerTimeStamp: -1}
-                    queryErr = insertRoomUser(db, gameRooms[accessCode].players[command[1]])
-                    if queryErr != nil {
-                        log.Printf("Error when inserting Room User information in the database, Command Executing : %s : %s\n", request, queryErr.Error())
-                    } else {
-                        //No error
-                        log.Printf("Player with username %s has been added to the Game Room with access Code : %s\n", command[1], accessCode)
-                    }
-                    gameRoomsMutex.Unlock()
-                    //Send Response to Proxy with accessCode
-                    conn.Write([]byte("Room Created:" + accessCode))
-                    if err != nil {
-                        //Proxy replication
-                        log.Printf("Failed to send the game Room access Code to the proxy. %s\n", err.Error())
-                    } else {
-                        //successful sent to the proxy of access Code
-                        log.Printf("Game Room Access Code : %s was sent to the Proxy.\n", accessCode)
-                    }
-                    //Now we are ready to add access code to the valid game rooms
-                    log.Printf("Game room with Access Code : %s is active. Listening for requests....\n", accessCode)
+					//Room should be activated now
+					gameRoomsMutex.Lock()
+					//add game room to the Game Rooms map
+					gameRooms[accessCode] = &gameRoom{accessCode: accessCode, currentRound: 0, numOfDisconnectedPlayers: 0, numOfPlayersAnsweredCorrect: 0, numOfPlayersAnswered: 0, accessCodeTimeStamp: -1, currentRoundTimeStamp: -1, numOfDisconnectedPlayersTimeStamp: -1, numOfPlayersAnsweredCorrectTimeStamp: -1, numOfPlayersAnsweredTimeStamp: -1, questions: make(map[int]*Question), players: make(map[string]*roomUser)}
+					queryErr := insertGameRoom(db, gameRooms[accessCode])
+					if queryErr != nil {
+						if queryErr != nil {
+							log.Printf("Error when inserting game Room information in the database, Command Executing : %s : %s\n", request, queryErr.Error())
+						}
+					}
+					//Add player who created the room to the hash
+					gameRooms[accessCode].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1, accessCodeTimeStamp: -1, pointsTimeStamp: -1, readyTimeStamp: -1, offlineTimeStamp: -1, roundAnswerTimeStamp: -1, correctAnswerTimeStamp: -1}
+					queryErr = insertRoomUser(db, gameRooms[accessCode].players[command[1]])
+					if queryErr != nil {
+						log.Printf("Error when inserting Room User information in the database, Command Executing : %s : %s\n", request, queryErr.Error())
+					} else {
+						//No error
+						log.Printf("Player with username %s has been added to the Game Room with access Code : %s\n", command[1], accessCode)
+					}
+					gameRoomsMutex.Unlock()
+					//Send Response to Proxy with accessCode
+					conn.Write([]byte("Room Created:" + accessCode))
+					if err != nil {
+						//Proxy replication
+						log.Printf("Failed to send the game Room access Code to the proxy. %s\n", err.Error())
+					} else {
+						//successful sent to the proxy of access Code
+						log.Printf("Game Room Access Code : %s was sent to the Proxy.\n", accessCode)
+					}
+					//Now we are ready to add access code to the valid game rooms
+					log.Printf("Game room with Access Code : %s is active. Listening for requests....\n", accessCode)
 				} else {
 					//some other type of error.
 				}
 			}
 		} else if strings.Compare(command[0], "Join Room") == 0 {
-			time_stamp = strconv.ParseInt(command[3], 10, 64)
+			time_stamp, _ = strconv.ParseInt(command[3], 10, 64)
 			//Join Room:UserName:Access Code:TimeStamp
 			//First check the game hashmap for the player
 			gameRoomsMutex.Lock()
@@ -135,7 +135,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 						if len(gameRooms[command[2]].players) < MAX_PLAYERS {
 							if gameRooms[command[2]].currentRound == 0 {
 								//player can join, there is room, assign it in memory
-								gameRooms[command[2]].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1, accessCodeTimeStamp:-1, pointsTimeStamp: -1, readyTimeStamp: -1, offlineTimeStamp: -1, roundAnswerTimeStamp: -1, correctAnswerTimeStamp: -1}
+								gameRooms[command[2]].players[command[1]] = &roomUser{username: command[1], accessCode: accessCode, points: 0, ready: 0, offline: 0, roundAnswer: 0, correctAnswer: -1, accessCodeTimeStamp: -1, pointsTimeStamp: -1, readyTimeStamp: -1, offlineTimeStamp: -1, roundAnswerTimeStamp: -1, correctAnswerTimeStamp: -1}
 								//we need to also check for errors for the sql query
 								insertRoomUser(db, gameRooms[command[2]].players[command[1]])
 								log.Printf("Successfully added user : %s to Game Room : %s\n", command[1], command[2])
@@ -173,83 +173,91 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			gameRoomsMutex.Unlock()
 		} else if strings.Compare(command[0], "Ready") == 0 {
 			//format should be of Ready:Username:AccessCode:Response:TimeStamp
-			time_stamp = strconv.ParseInt(command[3], 10, 64)
+			time_stamp, _ = strconv.ParseInt(command[3], 10, 64)
 			//update locally and in the database
 			gameRoomsMutex.Lock()
 			//since the map is loaded upon server promotion to Master, if the value is one, we don't need to update it
 			//in the database, the server crashed before a response was received from the proxy
- 			if (gameRooms[command[2]].players[command[1]].ready != 1) {
-                gameRooms[command[2]].players[command[1]].ready = 1
-                //Need testing, is there a chance we get 0 rows updated error in the new try if previously server crashed before proxy receives Ready Success response
-                //should not get an error unless db is down
-                queryErr := updateRoomUser(db, gameRooms[command[2]].players[command[1]])
-                if queryErr != nil {
-                    log.Printf("There was an error while updating the user in the db.Error : %s", queryErr.Error())
-                    _, err = conn.Write([]byte("READY_USER_DB_UPDATE_ERROR"))
-                    if err != nil {
-                        //proxy couldn't receive error from server, proxy crashed probably
-                        log.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
-                    } else {
-                        //error received from proxy
-                        log.Printf("Error READY_USER_DB_UPDATE_ERROR was sent to the proxy.\n")
-                    }
-                }
-            }
-            //check if all users are ready
-            var all_players_ready = true
-            for key, element := range gameRooms[command[2]].players {
-                if element.ready == 0 {
-                    log.Printf("User %s is not ready yet.\n", key)
-                    all_players_ready = false
-                    break
-                }
-            }
-            if all_players_ready == true {
-                //send to proxy all players ready
-                if gameRooms[command[2]].currentRound != 1 {
-                    gameRooms[command[2]].currentRound = 1
-                    updateRoom(db, gameRooms[command[2]])
-                    //Check if game questions have already been generated -> this happens if server crashed previously right before sending
-                    //questions to proxy
-                }
-                //There is a very very rare chance, server crashed before all generated questions where inserted in db. Worry about later
-                if len(gameRooms[command[2]].questions) < 10 {
-                    //Regenerate all questions - still need to check for rare case, will get insert errors probably, check later
-                    ok := generateQuestions(db, command[2])
-                    if ok {
-                        // Successfully generated questions and inserted them to the db.
-                        log.Printf("Successful generation of random questions for game room : %s.\n", accessCode)
-                    } else {
-                        // Error while generating a random set of questions for the game Room
-                        log.Printf("Failed to generate random questions for game room : %s.\n", accessCode)
-                    }
-                }
-                // If the server crashes here, we don't care, we just force a new timer in the time server, and
-                // Replace with time server request, need to implement
-                timer = time.Now()
-                // No timestamps required as ready request can be rewritten
-                _, err = conn.Write([]byte("All Ready:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[1].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[1].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[1].option_1 + "\",\"" + gameRooms[command[2]].questions[1].option_2 + "\", \"" + gameRooms[command[2]].questions[1].option_3 + "\", \"" + gameRooms[command[2]].questions[1].option_4 + "\"]}"))
-                if err != nil {
-                    //Proxy not connected, error, proxy replication
-                    log.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
-                } else {
-                    //successful sent of all questions to proxy
-                    log.Printf("Message All Ready:with all questions list was sent to the proxy.\n")
-                }
-            } else {
-                //Send Ready success to proxy, There are more players that have not pressed ready
-                _, err = conn.Write([]byte("Ready Success:" + command[1]))
-                if err != nil {
-                    //Proxy disconnection detected, part of proxy replication - dw about it rn
-                    log.Printf("There was an error while sending Ready Success to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
-                } else {
-                    //Successfully sent message to proxy
-                    log.Printf("Message Ready Success was sent to the proxy.\n")
-                }
-            }
+			if gameRooms[command[2]].players[command[1]].ready != 1 {
+				gameRooms[command[2]].players[command[1]].ready = 1
+				//Need testing, is there a chance we get 0 rows updated error in the new try if previously server crashed before proxy receives Ready Success response
+				//should not get an error unless db is down
+				queryErr := updateRoomUser(db, gameRooms[command[2]].players[command[1]])
+				if queryErr != nil {
+					log.Printf("There was an error while updating the user in the db.Error : %s", queryErr.Error())
+					_, err = conn.Write([]byte("READY_USER_DB_UPDATE_ERROR"))
+					if err != nil {
+						//proxy couldn't receive error from server, proxy crashed probably
+						log.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+					} else {
+						//error received from proxy
+						log.Printf("Error READY_USER_DB_UPDATE_ERROR was sent to the proxy.\n")
+					}
+				}
+			}
+			//check if all users are ready
+			var all_players_ready = true
+			for key, element := range gameRooms[command[2]].players {
+				if element.ready == 0 {
+					log.Printf("User %s is not ready yet.\n", key)
+					all_players_ready = false
+					break
+				}
+			}
+			if all_players_ready == true {
+				//send to proxy all players ready
+				if gameRooms[command[2]].currentRound != 1 {
+					gameRooms[command[2]].currentRound = 1
+					updateRoom(db, gameRooms[command[2]])
+					//Check if game questions have already been generated -> this happens if server crashed previously right before sending
+					//questions to proxy
+				}
+				//There is a very very rare chance, server crashed before all generated questions where inserted in db. Worry about later
+				if len(gameRooms[command[2]].questions) < 10 {
+					//Regenerate all questions - still need to check for rare case, will get insert errors probably, check later
+					ok := generateQuestions(db, command[2])
+					if ok {
+						// Successfully generated questions and inserted them to the db.
+						log.Printf("Successful generation of random questions for game room : %s.\n", accessCode)
+					} else {
+						// Error while generating a random set of questions for the game Room
+						log.Printf("Failed to generate random questions for game room : %s.\n", accessCode)
+					}
+				}
+				// If the server crashes here, we don't care, we just force a new timer in the time server, and
+				// Replace with time server request, need to implement
+				timer = time.Now()
+				_, err = timeserver_1_conn.Write([]byte("Start Timer:" + command[2]))
+				if err != nil {
+					//Proxy not connected, error, proxy replication
+					log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
+				} else {
+					//successful sent of all questions to proxy
+					log.Printf("Successfully started a timer for Game Room: %s, Error: \n", command[2])
+				}
+				// No timestamps required as ready request can be rewritten
+				_, err = conn.Write([]byte("All Ready:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[1].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[1].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[1].option_1 + "\",\"" + gameRooms[command[2]].questions[1].option_2 + "\", \"" + gameRooms[command[2]].questions[1].option_3 + "\", \"" + gameRooms[command[2]].questions[1].option_4 + "\"]}"))
+				if err != nil {
+					//Proxy not connected, error, proxy replication
+					log.Printf("There was an error while sending READY_USER_DB_UPDATE_ERROR to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+				} else {
+					//successful sent of all questions to proxy
+					log.Printf("Message All Ready:with all questions list was sent to the proxy.\n")
+				}
+			} else {
+				//Send Ready success to proxy, There are more players that have not pressed ready
+				_, err = conn.Write([]byte("Ready Success:" + command[1]))
+				if err != nil {
+					//Proxy disconnection detected, part of proxy replication - dw about it rn
+					log.Printf("There was an error while sending Ready Success to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
+				} else {
+					//Successfully sent message to proxy
+					log.Printf("Message Ready Success was sent to the proxy.\n")
+				}
+			}
 			gameRoomsMutex.Unlock()
 		} else if strings.Compare(command[0], "Answer") == 0 {
-			time_stamp = strconv.ParseInt(command[4], 10, 64)
+			time_stamp, _ = strconv.ParseInt(command[4], 10, 64)
 			//format should be of Answer:Username:AccessCode:Response:TimeStamp
 			var correct_answer = false
 			gameRoomsMutex.Lock()
@@ -333,12 +341,12 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			gameRoomsMutex.Unlock()
 			// Need to test for disconnection after the question is answered
 		} else if strings.Compare(command[0], "Disconnect") == 0 {
-			time_stamp = strconv.ParseInt(command[3], 10, 64)
+			time_stamp, _ = strconv.ParseInt(command[3], 10, 64)
 			//Disconnect:Username:AccessCode:TimeStamp
 			//Proxy informs us that the client disconnected
 			gameRoomsMutex.Lock()
 			//let's check if game exists (was it deleted during a server crash?)
-			_, ok = gameRooms[command[2]]
+			_, ok := gameRooms[command[2]]
 			if !ok {
 				log.Printf("The room was previously deleted.")
 				_, err = conn.Write([]byte("Successful Deletion of the Game Room."))
