@@ -13,7 +13,7 @@ func main() {
 	go serverListener()
 	log.Printf("after server listener started")
 	clientListener()
-	time.Sleep(100 * time.Second)
+	//time.Sleep(100 * time.Second)
 }
 
 func handleClientRequest(clientConn *websocket.Conn, connID int) {

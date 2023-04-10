@@ -40,6 +40,12 @@ func serverListener() {
 func clientListener() {
 	log.Printf("In client listener")
 	http.HandleFunc("/ws", wsEndpoint)
+	err := http.ListenAndServe(CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port, nil)
+	if err != nil {
+		log.Printf("Unable to Listen and Serve HTTP Requests on %s:%s. Error : %s.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port, err.Error())
+		//Need to handle error. Potential kill process.
+	}
+	log.Printf("Listening on %v:%v for client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
 }
 
 var clientCounter = 0
