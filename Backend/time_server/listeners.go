@@ -39,8 +39,8 @@ func serverListener() {
 
 func clientListener() {
 	log.Printf("In client listener")
-	http.HandleFunc("/ws", wsEndpoint)
-	err := http.ListenAndServe(CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port, nil)
+	http.HandleFunc("/ws/client", wsEndpoint)
+	err := http.ListenAndServe(CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port, nil) // Is this line a loop??
 	if err != nil {
 		log.Printf("Unable to Listen and Serve HTTP Requests on %s:%s. Error : %s.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port, err.Error())
 		//Need to handle error. Potential kill process.

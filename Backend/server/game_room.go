@@ -227,6 +227,14 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				// If the server crashes here, we don't care, we just force a new timer in the time server, and
 				// Replace with time server request, need to implement
 				timer = time.Now()
+				_, err = timeserver_1_conn.Write([]byte("Start Timer:" + command[2]))
+				if err != nil {
+					//Proxy not connected, error, proxy replication
+					log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
+				} else {
+					//successful sent of all questions to proxy
+					log.Printf("Successfully started a timer for Game Room: %s, Error: \n", command[2])
+				}
 				// No timestamps required as ready request can be rewritten
 				_, err = conn.Write([]byte("All Ready:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[1].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[1].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[1].option_1 + "\",\"" + gameRooms[command[2]].questions[1].option_2 + "\", \"" + gameRooms[command[2]].questions[1].option_3 + "\", \"" + gameRooms[command[2]].questions[1].option_4 + "\"]}"))
 				if err != nil {

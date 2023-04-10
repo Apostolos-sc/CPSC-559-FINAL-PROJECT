@@ -85,6 +85,7 @@ var db_master_pw = "password"
 var db_slave_user = "root"
 var db_slave_pw = "password"
 var game_points = [4]int{10, 9, 8, 7}
+var timeserver_1_conn *net.TCPConn
 
 func main() {
 	var portRead = -5
@@ -116,10 +117,10 @@ func main() {
 		}
 	}(db)
 
-	timeserver_1_conn := connectToTimeServer()
-	log.Printf("writing test")
-	timeserver_1_conn.Write([]byte("test"))
-	log.Printf("done writing test")
+	timeserver_1_conn = connectToTimeServer()
+	//log.Printf("writing test")
+	//timeserver_1_conn.Write([]byte("test"))
+	//log.Printf("done writing test")
 	//listen for other servers
 	//go listenForOtherServers(db)
 	if connectToProxy() {
