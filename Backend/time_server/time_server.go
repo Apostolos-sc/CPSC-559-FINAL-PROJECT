@@ -32,12 +32,25 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 			log.Printf("Message received from client with ID : %d.\n", connID)
 			n = len(buffer)
 			var command = strings.Split(string(buffer[:n]), ":")
-			// Still need to implement get timer
 			if strings.Compare(command[0], "ClientJoin") == 0 {
 				// format of message: ClientJoin:accessCode:username
 				// Need to check if the right person is making the request
-				gameRooms[command[1]] = make(map[string]*websocket.Conn)
-				gameRooms[command[1]][command[2]] = clientConn
+				gameRoomMutex.Lock()
+				_, ok := gameRooms[command[1]]
+				if ok {
+					gameRooms[command[1]][command[2]] = clientConn
+				} else {
+					gameRooms[command[1]] = make(map[string]*websocket.Conn)
+					gameRooms[command[1]][command[2]] = clientConn
+				}
+				gameRoomMutex.Unlock()
+			} else if strings.Compare(command[0], "ClientQuit") == 0 {
+				gameRooms[command[1]][command[2]].Close()
+				break // Exit out of the loop once the client disconnects
+			} else {
+				log.Printf("Unrecognized message format from the " +
+					"client, terminating connection")
+				break
 			}
 		}
 	}
@@ -46,59 +59,53 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 // Need to make it such that it continuously listens for the server request
 func handleServerRegistration(conn net.Conn) {
 	var buffer = make([]byte, 1024)
-	_, err = conn.Read(buffer)
-	if err != nil {
-		log.Printf("There was an issue with reading from the potential Server with IP %s. Error : %s.\n", conn.RemoteAddr(), err.Error())
-	}
-	// Steps:
-	// 1. Read for the server message
-	// 2. Check the message protocol
-	// 3. Send Accepted if timeserver request was accepted
-	var n = len(buffer)
-	var command = strings.Split(string(buffer[:n]), ":")
-	if strings.Compare(string(buffer[:n]), "Server Join") == 0 {
-		//Client attempting to connect is a server
-		//host, port, err := net.SplitHostPort(conn.RemoteAddr().String())
+	for {
+		_, err = conn.Read(buffer)
 		if err != nil {
-			log.Printf("There was an error while splitting the remote Address of server. Error : %s.", err.Error())
+			log.Printf("There was an issue with reading from the potential Server with IP %s. Error : %s.\n", conn.RemoteAddr(), err.Error())
 		}
-		log.Printf("Command : %v. Send Accepted.\n", string(buffer[:]))
-		conn.Write([]byte("Accepted"))
-
-	} else if strings.Compare(command[0], "StartTimer") == 0 {
-		// Format of message: StartTimer:accessCode:round
-		// Starts the timer for a game room -> server sends
-		// Starts sending timer every one sec to all the clients -> need list of clients for each gameroom
-		// End the timer if 30 secs have passed.
-		ticker := time.NewTicker(1 * time.Second)
-		done := make(chan bool)
-		go func() {
-			for {
-				select {
-				case t := <-ticker.C:
-					for _, value := range gameRooms[command[1]] {
-						err = value.WriteMessage(1, []byte(t.String()))
-						if err != nil {
-							//log.Printf("There was an issue while sending All Ready acknowledgment to player %s with IP address : %s. Error : %s \n", key, value.RemoteAddr(), err.Error())
-						} else {
-							log.Printf("Error sending timer to client")
-						}
-					}
-				case <-done:
-					ticker.Stop()
-				}
+		var n = len(buffer)
+		var command = strings.Split(string(buffer[:n]), ":")
+		if strings.Compare(string(buffer[:n]), "Server Join") == 0 {
+			//Client attempting to connect is a server
+			//host, port, err := net.SplitHostPort(conn.RemoteAddr().String())
+			if err != nil {
+				log.Printf("There was an error while splitting "+
+					"the remote Address of server in Time Server, Error : %s.", err.Error())
 			}
-		}()
-		time.Sleep(31 * time.Second) // Stopping the timer at the end of 31 secs
-		ticker.Stop()
-		done <- true
+			log.Printf("Command : %v. Send Accepted.\n", string(buffer[:]))
+			conn.Write([]byte("Accepted"))
 
-	} else {
-		_, err = conn.Write([]byte("Wrong command given, access declined."))
-		if err != nil {
-			log.Printf("There was an issue while informing the potential server that the given command is incorrect. \n %s", err.Error())
+		} else if strings.Compare(command[0], "StartTimer") == 0 {
+			ticker := time.NewTicker(1 * time.Second)
+			done := make(chan bool)
+			go func() {
+				for {
+					select {
+					case t := <-ticker.C:
+						for _, value := range gameRooms[command[1]] {
+							err = value.WriteMessage(1, []byte(t.String()))
+							if err != nil {
+							} else {
+								log.Printf("Error sending timer to server from time server")
+							}
+						}
+					case <-done:
+						ticker.Stop()
+					}
+				}
+			}()
+			time.Sleep(31 * time.Second) // Stopping the timer at the end of 31 secs
+			ticker.Stop()
+			done <- true
+
+		} else {
+			_, err = conn.Write([]byte("Wrong command given, access declined - Time server."))
+			if err != nil {
+				log.Printf("Time server connection failed unexpectedly %s", err.Error())
+				conn.Close()
+				break
+			}
 		}
 	}
-	// close conn
-	conn.Close()
 }
