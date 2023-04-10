@@ -9,11 +9,15 @@ import (
 )
 
 func main() {
+	log.Printf("In main")
 	go serverListener()
+	log.Printf("after server listener started")
 	clientListener()
+	time.Sleep(100 * time.Second)
 }
 
 func handleClientRequest(clientConn *websocket.Conn, connID int) {
+	log.Printf("In handle client request")
 	var n int
 	buffer := make([]byte, 1024)
 	err = clientConn.WriteMessage(1, []byte("Connection Established"))

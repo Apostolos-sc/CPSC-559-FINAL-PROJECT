@@ -11,8 +11,8 @@ type connection struct {
 	con_type string
 }
 
-var SERVER_REGISTRATION_1 = connection{"10.0.0.105", "6608", "tcp"}
-var SERVER_REGISTRATION_2 = connection{"10.0.0.105", "6609", "tcp"}
+var SERVER_REGISTRATION_1 = connection{"10.0.0.105", "6609", "tcp"}
+var SERVER_REGISTRATION_2 = connection{"10.0.0.105", "6610", "tcp"}
 var err error
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,

@@ -116,6 +116,10 @@ func main() {
 		}
 	}(db)
 
+	timeserver_1_conn := connectToTimeServer()
+	log.Printf("writing test")
+	timeserver_1_conn.Write([]byte("test"))
+	log.Printf("done writing test")
 	//listen for other servers
 	//go listenForOtherServers(db)
 	if connectToProxy() {
@@ -230,7 +234,7 @@ func testConnection(db *sql.DB, host string, port string) bool {
 }
 
 // Returns true if the proxy accepts the connection.
-func connectToTimeServer() bool {
+func connectToTimeServer() *net.TCPConn {
 	// connection type, IpAddres:Port
 	timeServerAddr, err := net.ResolveTCPAddr(TIME_SERVER_1.con_type, TIME_SERVER_1.host+":"+TIME_SERVER_2.port)
 	if err != nil {
@@ -261,6 +265,5 @@ func connectToTimeServer() bool {
 		//If the proxy accepted us, send the address we will be serving at
 		log.Printf("The message from time server is Accepted")
 	}
-	conn.Close()
-	return false
+	return conn
 }

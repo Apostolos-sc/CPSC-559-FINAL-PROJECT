@@ -8,6 +8,8 @@ import (
 )
 
 func serverListener() {
+
+	log.Printf("In server Listener")
 	serverRegistrationTCPAddr, err := net.ResolveTCPAddr(SERVER_REGISTRATION_1.con_type, SERVER_REGISTRATION_1.host+":"+SERVER_REGISTRATION_1.port)
 	if err != nil {
 		log.Printf("Unable to resolve IP address for server registration on the time server.\n")
@@ -36,12 +38,14 @@ func serverListener() {
 }
 
 func clientListener() {
+	log.Printf("In client listener")
 	http.HandleFunc("/ws", wsEndpoint)
 }
 
 var clientCounter = 0
 
 func wsEndpoint(w http.ResponseWriter, r *http.Request) {
+	log.Printf("In ws endpoint")
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	// upgrade this connection to a WebSocket Connection
 	ws, err := upgrader.Upgrade(w, r, nil)
