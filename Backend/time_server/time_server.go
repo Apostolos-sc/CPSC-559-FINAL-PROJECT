@@ -44,7 +44,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 }
 
 // Need to make it such that it continuously listens for the server request
-func handleServerRegistration(conn net.TCPConn) {
+func handleServerRegistration(conn net.Conn) {
 	var buffer = make([]byte, 1024)
 	_, err = conn.Read(buffer)
 	if err != nil {
