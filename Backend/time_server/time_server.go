@@ -17,10 +17,12 @@ func main() {
 }
 
 func handleClientRequest(clientConn *websocket.Conn, connID int) {
+	var accessCode string = ""
+	var username string = ""
 	log.Printf("In handle client request")
 	var n int
 	buffer := make([]byte, 1024)
-	err = clientConn.WriteMessage(1, []byte("Connection Established"))
+	err = clientConn.WriteMessage(1, []byte("Time Server: Connection Established"))
 	if err != nil {
 		log.Println("Failed to send a message to the client. Time Server Connection will be terminated.")
 	} else {
