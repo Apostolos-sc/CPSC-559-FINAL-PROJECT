@@ -6,7 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
+	//"time"
 )
 
 func handleGameConnection(db1 *sql.DB, db2 *sql.DB, conn net.Conn) {
@@ -123,7 +123,7 @@ func handleGameConnection(db1 *sql.DB, db2 *sql.DB, conn net.Conn) {
 					//let's check the type of queryError we got.
 					if queryErr == sql.ErrNoRows {
 						//user is not in any room
-						time.Sleep(5*time.Second)
+						//time.Sleep(5*time.Second)
 						if len(gameRooms[command[2]].players) < MAX_PLAYERS {
 							if gameRooms[command[2]].currentRound == 0 {
 								//player can join, there is room, assign it in memory
