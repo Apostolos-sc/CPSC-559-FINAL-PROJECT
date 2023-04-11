@@ -5,6 +5,7 @@
 package main
 
 import (
+    "github.com/gorilla/websocket"
 	"context"
 	"database/sql"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/url"
 )
 
 type Question struct {
@@ -70,22 +72,22 @@ var (
 	gameRooms      = make(map[string]*gameRoom)
 )
 
-var proxy_ip_address = "10.0.0.8"
+var proxy_ip_address = "10.0.0.2"
 var MAX_PLAYERS = 4
 var MAX_ROUNDS = 10
 var PROXY = connection{proxy_ip_address, "9000", "tcp"}
 var GAME_SERVICE = connection{proxy_ip_address, "8082", "tcp"}
 var SERVER_LISTENER = connection{proxy_ip_address, "7000", "tcp"}
-var DB_master = connection{"10.0.0.8", "4406", "tcp"}
-var DB_slave = connection{"10.0.0.8", "5506", "tcp"}
-var TIME_SERVER_1 = connection{"10.0.0.8", "6608", "tcp"}
-var TIME_SERVER_2 = connection{"10.0.0.8", "6609", "tcp"}
+var DB_master = connection{"10.0.0.2", "4406", "tcp"}
+var DB_slave = connection{"10.0.0.2", "5506", "tcp"}
+var TIME_SERVER_1 = connection{"10.0.0.2", "6608", "tcp"}
+var TIME_SERVER_2 = connection{"10.0.0.2", "6609", "tcp"}
 var db_master_user = "root"
 var db_master_pw = "password"
 var db_slave_user = "root"
 var db_slave_pw = "password"
 var game_points = [4]int{10, 9, 8, 7}
-var timeserver_1_conn *net.TCPConn
+var timeserver_1_conn *websocket.Conn
 
 func main() {
 	var portRead = -5
@@ -235,21 +237,28 @@ func testConnection(db *sql.DB, host string, port string) bool {
 }
 
 // Returns true if the proxy accepts the connection.
-func connectToTimeServer() *net.TCPConn {
+func connectToTimeServer() *websocket.Conn {
 	// connection type, IpAddres:Port
-	timeServerAddr, err := net.ResolveTCPAddr(TIME_SERVER_1.con_type, TIME_SERVER_1.host+":"+TIME_SERVER_2.port)
-	if err != nil {
-		log.Println("ResolveTCPAddr failed:", err.Error())
-		os.Exit(1)
-	}
-	// attempt to connect to proxy using a tcp connection
-	conn, err := net.DialTCP(TIME_SERVER_1.con_type, nil, timeServerAddr)
-	if err != nil {
-		log.Println("Dial failed:", err.Error())
-		os.Exit(1)
-	}
+	u := url.URL{Scheme: "ws", Host: TIME_SERVER_1.host+":"+TIME_SERVER_2.port, Path: "/ws/server",}
+    log.Printf("connecting to %s", u.String())
+// 	timeServerAddr, err := net.ResolveTCPAddr(TIME_SERVER_1.con_type, TIME_SERVER_1.host+":"+TIME_SERVER_2.port)
+// 	if err != nil {
+// 		log.Println("ResolveTCPAddr failed:", err.Error())
+// 		os.Exit(1)
+// 	}
+// 	// attempt to connect to proxy using a tcp connection
+// 	conn, err := net.DialTCP(TIME_SERVER_1.con_type, nil, timeServerAddr)
+// 	if err != nil {
+// 		log.Println("Dial failed:", err.Error())
+// 		os.Exit(1)
+// 	}
+    conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil);
 
-	_, err = conn.Write([]byte("Server Join"))
+    if err != nil {
+        log.Printf("handshake failed with status %d", resp.StatusCode)
+        log.Fatal("dial:", err)
+    }
+	err = conn.WriteMessage(1, []byte("Server Join"))
 	if err != nil {
 		log.Println("Write data failed:", err.Error())
 		os.Exit(1)
@@ -257,7 +266,8 @@ func connectToTimeServer() *net.TCPConn {
 
 	// buffer to get data
 	received := make([]byte, 8192)
-	n, err := conn.Read(received)
+	var n int
+	n, received, err = conn.ReadMessage()
 	if err != nil {
 		log.Println("Read data failed:", err.Error())
 		os.Exit(1)

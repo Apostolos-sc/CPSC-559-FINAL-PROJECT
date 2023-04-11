@@ -12,13 +12,12 @@ func clientListener() {
 	//websocket handler - no error handling needed here
 	http.HandleFunc("/ws", wsEndpoint)
 	//http listener
-	log.Printf("Listening on %v:%v for Client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
+	log.Printf("Attempting to listen on %v:%v for Client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
 	err := http.ListenAndServe(CLIENT_SERVICE.host+":"+CLIENT_SERVICE.port, nil)
 	if err != nil {
 		log.Printf("Unable to Listen and Serve HTTP Requests on %s:%s. Error : %s.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port, err.Error())
 		//Need to handle error. Potential kill process.
 	}
-	log.Printf("Listening on %v:%v for client Requests.\n", CLIENT_SERVICE.host, CLIENT_SERVICE.port)
 
 }
 

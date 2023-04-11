@@ -226,14 +226,21 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				}
 				// If the server crashes here, we don't care, we just force a new timer in the time server, and
 				// Replace with time server request, need to implement
-				timer = time.Now()
-				_, err = timeserver_1_conn.Write([]byte("Start Timer:" + command[2]))
+				err = timeserver_1_conn.WriteMessage(1, []byte("Create Room:"+ command[2] + ":1"))
+                if err != nil {
+                    //Problem Creating Room in Time Server
+                    log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
+                } else {
+                    //successful start of a timer for Game Room
+                    log.Printf("Successfully started a timer for Game Room: %s", command[2])
+                }
+				err = timeserver_1_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
 				if err != nil {
 					//Proxy not connected, error, proxy replication
 					log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
 				} else {
-					//successful sent of all questions to proxy
-					log.Printf("Successfully started a timer for Game Room: %s, Error: \n", command[2])
+					//successful start of a timer for Game Room
+					log.Printf("Successfully started a timer for Game Room: %s", command[2])
 				}
 				// No timestamps required as ready request can be rewritten
 				_, err = conn.Write([]byte("All Ready:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[1].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[1].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[1].option_1 + "\",\"" + gameRooms[command[2]].questions[1].option_2 + "\", \"" + gameRooms[command[2]].questions[1].option_3 + "\", \"" + gameRooms[command[2]].questions[1].option_4 + "\"]}"))
@@ -279,7 +286,6 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			log.Printf("Players Answered : %d.\n", gameRooms[command[2]].numOfPlayersAnswered)
 			log.Printf("Total players in the game Room : %d.\n", len(gameRooms[command[2]].players))
 
-			// Need to test if the player leaves after entering the answer, before at least one player is yet to answer - glitch
 			if gameRooms[command[2]].numOfPlayersAnswered >= (len(gameRooms[command[2]].players) - gameRooms[command[2]].numOfDisconnectedPlayers) {
 				if gameRooms[command[2]].currentRound < 10 {
 					gameRooms[command[2]].currentRound++
@@ -294,7 +300,14 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					} else {
 						log.Printf("Message Everyone Responsed was sent to the proxy.\n")
 					}
-					timer = time.Now()
+                    err = timeserver_1_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                    if err != nil {
+                        //Proxy not connected, error, proxy replication
+                        log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
+                    } else {
+                        //successful start of a timer for Game Room
+                        log.Printf("Successfully started a timer for Game Room: %s", command[2])
+                    }
 					gameRooms[command[2]].numOfPlayersAnswered = 0
 					gameRooms[command[2]].numOfPlayersAnsweredCorrect = 0
 					updateRoom(db, gameRooms[command[2]])
@@ -359,9 +372,6 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			} else {
 				//Check if the game is going or still in lobby
 				if gameRooms[command[2]].currentRound > 0 && gameRooms[command[2]].currentRoundTimeStamp != time_stamp {
-					if gameRooms[command[2]].numOfDisconnectedPlayersTimeStamp != time_stamp {
-
-					}
 					if len(gameRooms[command[2]].players)-gameRooms[command[2]].numOfDisconnectedPlayers-1 == 0 {
 						//Last player in the room that disconnected. Let's terminate the game, delete users from room, room questions
 						deleteRoomUsers(db, command[2])
@@ -382,9 +392,9 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 						return
 					} else {
 						gameRooms[command[2]].players[command[1]].offline = 1
-						updateRoomUser(db, gameRooms[command[2]].players[command[1]])
+                        gameRooms[command[2]].players[command[1]].offlineTimeStamp = time_stamp
 						gameRooms[command[2]].numOfDisconnectedPlayers++
-						updateRoom(db, gameRooms[command[2]])
+						gameRooms[command[2]].numOfDisconnectedPlayersTimeStamp = time_stamp
 						var all_active_players_answered = true
 						for _, value := range gameRooms[command[2]].players {
 							if value.offline == 0 {
@@ -398,7 +408,11 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 							//all active players answered, let's send next round information
 							if gameRooms[command[2]].currentRound < 10 {
 								gameRooms[command[2]].currentRound++
-								updateRoom(db, gameRooms[command[2]])
+                                gameRooms[command[2]].numOfPlayersAnswered = 0
+                                gameRooms[command[2]].numOfPlayersAnsweredCorrect = 0
+								gameRooms[command[2]].currentRoundTimeStamp = time_stamp
+                                gameRooms[command[2]].numOfPlayersAnsweredTimeStamp = time_stamp
+                                gameRooms[command[2]].numOfPlayersAnsweredCorrectTimeStamp = time_stamp
 								var player_object_string = "\"leaderboard\":["
 								for key, value := range gameRooms[command[2]].players {
 									player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
@@ -410,18 +424,15 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 									log.Printf("Message Everyone Responded was sent to the proxy.\n")
 								}
 								timer = time.Now()
-								gameRooms[command[2]].numOfPlayersAnswered = 0
-								gameRooms[command[2]].numOfPlayersAnsweredCorrect = 0
 								updateRoom(db, gameRooms[command[2]])
 							} else {
+							    //Last Round ended, let's send leaderboard
 								var player_object_string string = "{\"leaderboard\":["
 								for key, value := range gameRooms[command[2]].players {
 									player_object_string = player_object_string + "{\"username\":\"" + key + "\",\"points\":\"" + strconv.Itoa(value.points) + "\"},"
 								}
 								//We need to delete data from database
-								for key, _ := range gameRooms[command[2]].players {
-									deleteRoomUser(db, key)
-								}
+                                deleteRoomUsers(db, command[2])
 								deleteGameRoom(db, command[2])
 								deleteRoomQuestions(db, command[2])
 								_, err = conn.Write([]byte("Game Over:" + player_object_string[:len(player_object_string)-1] + "]" + "}"))
@@ -444,6 +455,8 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 								log.Printf("Message LobbyDisconnect:%s was sent to the proxy.\n", command[1])
 							}
 						}
+                        updateRoomUser(db, gameRooms[command[2]].players[command[1]])
+                        updateRoom(db, gameRooms[command[2]])
 						//need to check these queries in case db flops
 					}
 				} else {
