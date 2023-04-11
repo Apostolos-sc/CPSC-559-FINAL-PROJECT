@@ -1,0 +1,95 @@
+version: '3'
+services:
+  db1:
+    image: database_server
+    build: database_server
+    env_file:
+      - ./database_server/db1/.env
+    environment:
+      ID: 1
+      REPLICA_ID: 2
+    container_name: "database_server_1"
+    restart: always
+    volumes:
+      - ./database_server/db1/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./sqldump:/sqldump
+      - ./questions.sql:/questions.sql
+    networks:
+      - overlay
+    healthcheck:
+      test: "mysql --user=root --password=password --execute \"SHOW DATABASES;\""
+      interval: 2s
+      timeout: 30s
+      retries: 15
+
+  db2:
+    image: database_server
+    build: database_server
+    env_file:
+      - ./database_server/db2/.env
+    environment:
+      ID: 2
+      REPLICA_ID: 1
+    container_name: "database_server_2"
+    restart: always
+    depends_on:
+      db1:
+        condition: service_healthy
+    volumes:
+      - ./database_server/db2/mysql.conf.cnf:/etc/mysql/conf.d/mysql.conf.cnf
+      - ./sqldump:/sqldump
+    networks:
+      - overlay
+    healthcheck:
+      test: "mysql --user=root --password=password --execute \"SHOW DATABASES;\""
+      interval: 2s
+      timeout: 30s
+      retries: 15
+
+  mysql_monitor:
+    image: database_monitor
+    container_name: "database_monitor"
+    build: database_monitor
+    restart: always
+    tty: true
+    depends_on:
+      db1:
+        condition: service_healthy
+      db2:
+        condition: service_healthy
+    networks:
+      - overlay
+
+  nginx_1:
+    container_name: nginx_1
+    image: nginx
+    ports:
+      - "4406:3306"
+    tty: true
+    depends_on:
+      db1:
+        condition: service_healthy
+      db2:
+        condition: service_healthy
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - overlay
+
+  nginx_2:
+    container_name: nginx_2
+    image: nginx
+    ports:
+      - "5506:3306"
+    tty: true
+    depends_on:
+      db1:
+        condition: service_healthy
+      db2:
+        condition: service_healthy
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - overlay
+networks:
+  overlay:
