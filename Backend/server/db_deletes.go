@@ -6,8 +6,25 @@ import (
 	"log"
 	"time"
 )
+func ping(db1 *sql.DB, db2 *sql.DB) *sql.DB {
+    //Ping first db
+    err := db1.Ping()
+    if err != nil {
+    	log.Printf("There was an issue when pinging db1.")
+    	//Ping second db
+    	err = db2.Ping()
+    	if err != nil {
+    	    log.Printf("There was an issue when pinging db2.")
+    	}
+    	//we assume db2 will be up if first failed
+    	return db2
+    } else {
+        return db1
+    }
+}
 
-func deleteGameRoom(db *sql.DB, accessCode string) error {
+func deleteGameRoom(db1 *sql.DB, db2 *sql.DB,accessCode string) error {
+    db := ping(db1, db2)
 	query := "DELETE FROM gameRoom WHERE accessCode = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
@@ -31,7 +48,8 @@ func deleteGameRoom(db *sql.DB, accessCode string) error {
 	return nil
 }
 
-func deleteRoomUser(db *sql.DB, username string) error {
+func deleteRoomUser(db1 *sql.DB, db2 *sql.DB,username string) error {
+    db := ping(db1, db2)
 	query := "DELETE FROM roomUser WHERE username = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
@@ -55,7 +73,8 @@ func deleteRoomUser(db *sql.DB, username string) error {
 	return nil
 }
 
-func deleteRoomUsers(db *sql.DB, accessCode string) error {
+func deleteRoomUsers(db1 *sql.DB, db2 *sql.DB, accessCode string) error {
+    db := ping(db1, db2)
 	query := "DELETE FROM roomUser WHERE accessCode = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
@@ -79,7 +98,8 @@ func deleteRoomUsers(db *sql.DB, accessCode string) error {
 	return nil
 }
 
-func deleteRoomQuestions(db *sql.DB, accessCode string) error {
+func deleteRoomQuestions(db1 *sql.DB, db2 *sql.DB, accessCode string) error {
+    db := ping(db1, db2)
 	query := "DELETE FROM roomQuestions WHERE accessCode = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()

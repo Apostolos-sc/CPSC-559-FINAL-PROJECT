@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-func insertRoomUser(db *sql.DB, player *roomUser) error {
+func insertRoomUser(db1 *sql.DB, db2 *sql.DB, player *roomUser) error {
+	db := ping(db1, db2)
 	query := "INSERT INTO roomUser(username, accessCode, points, ready, offline, roundAnswer, correctAnswer, accessCodeTimeStamp, pointsTimeStamp, readyTimeStamp, offlineTimeStamp, roundAnswerTimeStamp, correctAnswerTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
@@ -31,7 +32,8 @@ func insertRoomUser(db *sql.DB, player *roomUser) error {
 	return nil
 }
 
-func insertGameRoom(db *sql.DB, room *gameRoom) error {
+func insertGameRoom(db1 *sql.DB, db2 *sql.DB, room *gameRoom) error {
+	db := ping(db1, db2)
 	query := "INSERT INTO gameRoom(accessCode, currentRound, numOfPlayersAnswered, numOfPlayersAnsweredCorrect, numOfDisconnectedPlayers, accessCodeTimeStamp, currentRoundTimeStamp, numOfPlayersAnsweredTimeStamp, numOfPlayersAnsweredCorrectTimeStamp, numOfDisconnectedPlayersTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
@@ -55,7 +57,8 @@ func insertGameRoom(db *sql.DB, room *gameRoom) error {
 	return nil
 }
 
-func insertRoomQuestions(db *sql.DB, accessCode string, q1 int, q2 int, q3 int, q4 int, q5 int, q6 int, q7 int, q8 int, q9 int, q10 int) error {
+func insertRoomQuestions(db1 *sql.DB, db2 *sql.DB, accessCode string, q1 int, q2 int, q3 int, q4 int, q5 int, q6 int, q7 int, q8 int, q9 int, q10 int) error {
+	db := ping(db1, db2)
 	query := "INSERT INTO roomQuestions(accessCode, question_1_id,question_2_id,question_3_id,question_4_id,question_5_id,question_6_id,question_7_id,question_8_id,question_9_id,question_10_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()

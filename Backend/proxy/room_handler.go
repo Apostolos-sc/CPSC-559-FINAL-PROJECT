@@ -10,6 +10,9 @@ import (
 )
 
 func handleClientRequest(clientConn *websocket.Conn, connID int) {
+//     var timeout = 5*time.Second
+//     SetReadDeadline(time.Now().Add(timeout))
+// SetReadDeadline(time.Now().Add(time.Time{})
 	var time_stamp int64
 	var service_completed = true
 	var command []string
@@ -69,13 +72,13 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							gameRoomMutex.Unlock()
 							continue
 						}
-						//Wait for server to respond, that the Game was successfully terminated.
 						nResponse, err = gameRooms[previousCommandString[2]].gameRoomConn.Read(serverResponseBuffer)
 						if err != nil {
 							//Operation failed, let's wake up back up server
 							log.Printf("The server failed to inform us that the game was successfully terminated. Find new server.")
 							gameRoomConn = restartServer()
 							gameRoomMutex.Unlock()
+
 							continue
 						} else {
 							//We know operation completed successfully
@@ -102,7 +105,6 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 							gameRoomMutex.Unlock()
 							continue
 						}
-
 						nResponse, err = gameRooms[previousCommandString[2]].gameRoomConn.Read(serverResponseBuffer)
 						if err != nil {
 							log.Printf("There was an error while waiting for the server to respond on disconnect command. Error : %s\n", err.Error())
@@ -171,6 +173,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 			}
 			break
 		}
+
 		if service_completed == true {
 			log.Printf("Waiting to read from client with ID %d.\n", connID)
 			_, buffer, err = clientConn.ReadMessage()
@@ -312,8 +315,6 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						service_completed = false
 						continue
 					}
-					//Potential Race Condition, Come Back might need to add timestamps, Potential buffer issue with nanoseconds
-					//if timestamp ends in zero. Test. (add semicolon maybe at the end of timestamps)
 					nResponse, err = gameRooms[command[2]].gameRoomConn.Read(serverResponseBuffer)
 					if err != nil {
 						//failed to receive response for join room
@@ -444,9 +445,6 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						service_completed = false
 						continue
 					} else {
-						//Setting Deadline to test
-						//timeoutDuration := 1 * time.Second
-						//gameRoomConn.SetReadDeadline(time.Now().Add(timeoutDuration))
 						//Potential Race Condition, need timestamps
 						nResponse, err = gameRooms[command[2]].gameRoomConn.Read(serverResponseBuffer)
 						if err != nil {
@@ -542,9 +540,6 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 				gameRoomMutex.Unlock()
 			} else if strings.Compare(command[0], "Ready") == 0 {
 				//Setting Deadline to test
-				//timeoutDuration := 1 * time.Second
-				//gameRoomConn.SetReadDeadline(time.Now().Add(timeoutDuration))
-
 				//Ready to start request from client let's work Ready:Username:AccessCode
 				log.Printf("Ready Request : %s. Client's IP : %s\n", request, clientConn.RemoteAddr())
 				gameRoomMutex.Lock()

@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-func fetchRoomQuestions(db *sql.DB, accessCode string) error {
+func fetchRoomQuestions(db1 *sql.DB, db2 *sql.DB, accessCode string) error {
+    db := ping(db1, db2)
 	var questions [10]int
 	var code string
 	log.Printf("Getting roomQuestions for room %s.\n", accessCode)
@@ -28,7 +29,7 @@ func fetchRoomQuestions(db *sql.DB, accessCode string) error {
 	}
 	for i := 0; i < 10; i++ {
 		var question *Question
-		question, err = fetchQuestion(db, questions[i])
+		question, err = fetchQuestion(db1, db2, questions[i])
 		if err != nil {
 			log.Printf("An error occurred while fetching question with id %d. Error : %s.", i, err.Error())
 		} else {
@@ -38,7 +39,8 @@ func fetchRoomQuestions(db *sql.DB, accessCode string) error {
 	}
 	return nil
 }
-func fetchQuestion(db *sql.DB, ID int) (*Question, error) {
+func fetchQuestion(db1 *sql.DB, db2 *sql.DB, ID int) (*Question, error) {
+    db := ping(db1, db2)
 	log.Printf("Getting Question with ID : %d.\n", ID)
 	query := "SELECT * FROM questions where question_id = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
@@ -72,7 +74,8 @@ func fetchQuestion(db *sql.DB, ID int) (*Question, error) {
 
 // Function used to fetch information about the game room : accessCode
 // This function needs to be tested
-func fetchRoom(db *sql.DB, accessCode string) error {
+func fetchRoom(db1 *sql.DB, db2 *sql.DB, accessCode string) error {
+    db := ping(db1, db2)
 	log.Printf("Getting Game Room with access code : %s", accessCode)
 	query := "select * from gameRoom WHERE accessCode = ?;"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
@@ -94,7 +97,8 @@ func fetchRoom(db *sql.DB, accessCode string) error {
 	log.Printf("Successfully loaded Game Room with information %s, %d, %d, %d, %d, %d, %d, %d, %d, %d.\n", room.accessCode, gameRooms[room.accessCode].currentRound, gameRooms[room.accessCode].numOfPlayersAnswered, gameRooms[room.accessCode].numOfPlayersAnsweredCorrect, gameRooms[room.accessCode].numOfDisconnectedPlayers, gameRooms[room.accessCode].accessCodeTimeStamp, gameRooms[room.accessCode].currentRoundTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredCorrectTimeStamp, gameRooms[room.accessCode].numOfDisconnectedPlayersTimeStamp)
 	return nil
 }
-func fetchRooms(db *sql.DB) error {
+func fetchRooms(db1 *sql.DB, db2 *sql.DB,) error {
+    db := ping(db1, db2)
 	log.Printf("Getting games")
 	query := "select * from gameRoom;"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
@@ -125,7 +129,8 @@ func fetchRooms(db *sql.DB) error {
 	return nil
 }
 
-func fetchRoomUsers(db *sql.DB, accessCode string) error {
+func fetchRoomUsers(db1 *sql.DB, db2 *sql.DB, accessCode string) error {
+    db := ping(db1, db2)
 	log.Printf("Getting room Users for room %s.", accessCode)
 	query := "select * FROM roomUser WHERE accessCode = ?;"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
@@ -155,7 +160,8 @@ func fetchRoomUsers(db *sql.DB, accessCode string) error {
 	return nil
 }
 
-func fetchRoomUser(db *sql.DB, username string) (*roomUser, error) {
+func fetchRoomUser(db1 *sql.DB, db2 *sql.DB, username string) (*roomUser, error) {
+    db := ping(db1, db2)
 	log.Printf("Search for room user %s.\n", username)
 	query := "SELECT * FROM roomUser where username = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)

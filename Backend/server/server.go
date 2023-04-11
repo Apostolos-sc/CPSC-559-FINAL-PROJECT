@@ -78,14 +78,12 @@ var MAX_ROUNDS = 10
 var PROXY = connection{proxy_ip_address, "9000", "tcp"}
 var GAME_SERVICE = connection{proxy_ip_address, "8082", "tcp"}
 var SERVER_LISTENER = connection{proxy_ip_address, "7000", "tcp"}
-var DB_master = connection{"10.0.0.2", "4406", "tcp"}
-var DB_slave = connection{"10.0.0.2", "5506", "tcp"}
+var nginx_master = connection{"10.0.0.2", "4406", "tcp"}
+var nginx_slave = connection{"10.0.0.2", "5506", "tcp"}
 var TIME_SERVER_1 = connection{"10.0.0.2", "6609", "tcp"}
 var TIME_SERVER_2 = connection{"10.0.0.2", "6610", "tcp"}
-var db_master_user = "root"
-var db_master_pw = "password"
-var db_slave_user = "root"
-var db_slave_pw = "password"
+var db_user = "root"
+var db_pw = "password"
 var game_points = [4]int{10, 9, 8, 7}
 var timeserver_1_conn *websocket.Conn
 var timeserver_2_conn *websocket.Conn
@@ -105,20 +103,35 @@ func main() {
 	}
 	GAME_SERVICE.port = strconv.Itoa(portRead)
 	log.Printf("Read Port # : %d.\n", portRead)
-	db, err := sql.Open("mysql", db_master_user+":"+db_master_pw+"@tcp("+DB_master.host+":"+DB_master.port+")/mydb")
+	db1, err := sql.Open("mysql", db_user+":"+db_pw+"@tcp("+nginx_master.host+":"+nginx_master.port+")/mydb")
 	if err != nil {
 		log.Printf("There was an DSN issue when opening the DB driver. Error : %s.\n", err.Error())
 	}
-	db.SetConnMaxLifetime(time.Minute * 3)
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(10)
+	db1.SetConnMaxLifetime(time.Minute * 3)
+	db1.SetMaxOpenConns(10)
+	db1.SetMaxIdleConns(10)
 
-	defer func(db *sql.DB) {
-		err := db.Close()
+	defer func(db1 *sql.DB) {
+		err := db1.Close()
 		if err != nil {
 			log.Printf("There was an error closing the database connection. Error : %s.\n", err.Error())
 		}
-	}(db)
+	}(db1)
+
+	db2, err := sql.Open("mysql", db_user+":"+db_pw+"@tcp("+nginx_slave.host+":"+nginx_slave.port+")/mydb")
+	if err != nil {
+		log.Printf("There was an DSN issue when opening the DB driver. Error : %s.\n", err.Error())
+	}
+	db2.SetConnMaxLifetime(time.Minute * 3)
+	db2.SetMaxOpenConns(10)
+	db2.SetMaxIdleConns(10)
+
+	defer func(db2 *sql.DB) {
+		err := db2.Close()
+		if err != nil {
+			log.Printf("There was an error closing the database connection. Error : %s.\n", err.Error())
+		}
+	}(db2)
 
 	timeserver_1_conn = connectToTimeServer(TIME_SERVER_1)
 	timeserver_2_conn = connectToTimeServer(TIME_SERVER_2)
@@ -157,7 +170,7 @@ func main() {
 			}
 			log.Printf("Incoming connection from : %s\n", conn.RemoteAddr().String())
 			//Sub routine is called and we pass to it the connection parameter to be handled
-			go handleGameConnection(db, conn)
+			go handleGameConnection(db1,db2, conn)
 		}
 	} else {
 		log.Println("Failed to register server at the proxy.")
