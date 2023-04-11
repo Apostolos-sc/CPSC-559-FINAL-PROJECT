@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-func updateRoom(db *sql.DB, room *gameRoom) error {
+func updateRoom(db1 *sql.DB, db2 *sql.DB, room *gameRoom) error {
+    db := ping(db1, db2)
 	query := "UPDATE gameRoom SET currentRound = ?, numOfPlayersAnswered=?, numOfPlayersAnsweredCorrect=?, numOfDisconnectedPlayers=?, accessCodeTimeStamp=?, currentRoundTimeStamp = ?, numOfPlayersAnsweredTimeStamp=?, numOfPlayersAnsweredCorrectTimeStamp=?, numOfDisconnectedPlayersTimeStamp=? WHERE accesscode = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()
@@ -30,7 +31,8 @@ func updateRoom(db *sql.DB, room *gameRoom) error {
 	log.Printf("%d rows updated gameRoom now contains information %s, %d, %d, %d, %d, %d, %d, %d, %d, %d.", rows, room.accessCode, room.currentRound, room.numOfPlayersAnswered, room.numOfPlayersAnsweredCorrect, room.numOfDisconnectedPlayers, room.accessCodeTimeStamp, room.currentRoundTimeStamp, room.numOfPlayersAnsweredTimeStamp, room.numOfPlayersAnsweredCorrectTimeStamp, room.numOfDisconnectedPlayersTimeStamp)
 	return nil
 }
-func updateRoomUser(db *sql.DB, user *roomUser) error {
+func updateRoomUser(db1 *sql.DB, db2 *sql.DB, user *roomUser) error {
+    db := ping(db1, db2)
 	query := "UPDATE roomUser SET points = ?, ready = ?, offline=?, roundAnswer=?, correctAnswer=?, accessCodeTimeStamp=?, pointsTimeStamp = ?, readyTimeStamp = ?, offlineTimeStamp=?, roundAnswerTimeStamp=?, correctAnswerTimeStamp=? WHERE username = ?"
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelfunc()

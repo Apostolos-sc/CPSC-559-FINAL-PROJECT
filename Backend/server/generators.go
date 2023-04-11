@@ -37,7 +37,7 @@ func generateAccessCode() string {
 	}
 }
 
-func generateQuestions(db *sql.DB, accessCode string) bool {
+func generateQuestions(db1 *sql.DB,db2 *sql.DB, accessCode string) bool {
 	rand.Seed(time.Now().UnixNano())
 
 	// Intn generates a random integer between 0 and 100
@@ -50,14 +50,14 @@ func generateQuestions(db *sql.DB, accessCode string) bool {
 		randomInts[i] = rand.Intn(maxQuestionsID)
 		log.Printf("Random Questions ID %d for Room :%s generated.", randomInts[i], accessCode)
 	}
-	err := insertRoomQuestions(db, accessCode, randomInts[0], randomInts[1], randomInts[2], randomInts[3], randomInts[4], randomInts[5], randomInts[6], randomInts[7], randomInts[8], randomInts[9])
+	err := insertRoomQuestions(db1, db2, accessCode, randomInts[0], randomInts[1], randomInts[2], randomInts[3], randomInts[4], randomInts[5], randomInts[6], randomInts[7], randomInts[8], randomInts[9])
 	if err != nil {
 		//log the error return false
 		log.Printf("There was an error when inserting the random generated Questions for room with accessCode : %s. Error : %s.\n", accessCode, err.Error())
 		return false
 	} else {
 		for i := 0; i < 10; i++ {
-			questionsList[i], err = fetchQuestion(db, randomInts[i])
+			questionsList[i], err = fetchQuestion(db1,db2, randomInts[i])
 			if err != nil {
 				log.Printf("There was an issue when reading Question %d for game Room : %s. Error : %s.\n", i, accessCode, err.Error())
 			} else {
