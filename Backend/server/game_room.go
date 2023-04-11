@@ -2,19 +2,16 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func handleGameConnection(db *sql.DB, conn net.Conn) {
 	//each game Room Connection should be handled till the game is over
 	//might wanna check and see if the game request is in proper format / incase of data corruption.
 	//send message
-	var timer = time.Now()
 	var requestBuffer = make([]byte, 1024)
 	//var responseBuffer = make([]byte, 1024)
 	var accessCode string
@@ -103,17 +100,10 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				gameRooms[command[2]].players[command[1]].offline = 0
 				//update database to reflect user reconnected
 				updateRoomUser(db, gameRooms[command[2]].players[command[1]])
-				elapsed := time.Since(timer).Seconds()
-				var time_left string
-				if float64(35)-elapsed < 0 {
-					time_left = "0"
-				} else {
-					time_left = fmt.Sprintf("%f", float64(35)-elapsed)
-				}
 				gameRooms[command[2]].numOfDisconnectedPlayers--
 				updateRoom(db, gameRooms[command[2]])
 				//Remind danny to connect to time server upon reconnection
-				conn.Write([]byte("Reconnect Success:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_1 + "\",\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_2 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_3 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_4 + "\"],\"time\":\"" + time_left + "\"}"))
+				conn.Write([]byte("Reconnect Success:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_1 + "\",\"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_2 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_3 + "\", \"" + gameRooms[command[2]].questions[gameRooms[command[2]].currentRound].option_4 + "\"]}"))
 				if err != nil {
 					log.Printf("There was an error while sending Reconnect Succes to proxy. Game Room: %s, Error: %s\n", command[2], err.Error())
 				} else {
@@ -229,19 +219,37 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 				err = timeserver_1_conn.WriteMessage(1, []byte("Create Room:"+ command[2] + ":1"))
                 if err != nil {
                     //Problem Creating Room in Time Server
-                    log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
+                    log.Printf("Problem creating a timer room on Time Server 1 for Game Room: %s, Error: %s\n", command[2], err.Error())
                 } else {
                     //successful start of a timer for Game Room
-                    log.Printf("Successfully started a timer for Game Room: %s", command[2])
+                    log.Printf("Successfully started a timer room on Time Server 1 for Game Room: %s", command[2])
                 }
-				err = timeserver_1_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
-				if err != nil {
-					//Proxy not connected, error, proxy replication
-					log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
-				} else {
-					//successful start of a timer for Game Room
-					log.Printf("Successfully started a timer for Game Room: %s", command[2])
-				}
+				err = timeserver_2_conn.WriteMessage(1, []byte("Create Room:"+ command[2] + ":1"))
+                if err != nil {
+                    //Problem Creating Room in Time Server
+                    log.Printf("Problem creating a timer room on Time Server 2 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                } else {
+                    //successful start of a timer for Game Room
+                    log.Printf("Successfully started a timer room on Time Server 2 for Game Room: %s", command[2])
+                }
+                //Time Server 1
+                err = timeserver_1_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                if err != nil {
+                    //Proxy not connected, error, proxy replication
+                    log.Printf("Problem starting a timer on Time Server 1 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                } else {
+                    //successful start of a timer for Game Room
+                    log.Printf("Successfully started a timer on Time Server 1 for Game Room: %s", command[2])
+                }
+                //Time Server 2
+                err = timeserver_2_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                if err != nil {
+                    //Proxy not connected, error, proxy replication
+                    log.Printf("Problem starting a timer on Time Server 2 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                } else {
+                    //successful start of a timer for Game Room
+                    log.Printf("Successfully started a timer on Time Server 2 for Game Room: %s", command[2])
+                }
 				// No timestamps required as ready request can be rewritten
 				_, err = conn.Write([]byte("All Ready:{\"round\":\"" + strconv.Itoa(gameRooms[command[2]].currentRound) + "\",\"question\":\"" + gameRooms[command[2]].questions[1].question + "\",\"answer\":\"" + gameRooms[command[2]].questions[1].answer + "\", \"options\":[\"" + gameRooms[command[2]].questions[1].option_1 + "\",\"" + gameRooms[command[2]].questions[1].option_2 + "\", \"" + gameRooms[command[2]].questions[1].option_3 + "\", \"" + gameRooms[command[2]].questions[1].option_4 + "\"]}"))
 				if err != nil {
@@ -300,13 +308,23 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 					} else {
 						log.Printf("Message Everyone Responsed was sent to the proxy.\n")
 					}
+                    //Time Server 1
                     err = timeserver_1_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
                     if err != nil {
                         //Proxy not connected, error, proxy replication
-                        log.Printf("Problem starting a timer for Game Room: %s, Error: %s\n", command[2], err.Error())
+                        log.Printf("Problem starting a timer on Time Server 1 for Game Room: %s, Error: %s\n", command[2], err.Error())
                     } else {
                         //successful start of a timer for Game Room
-                        log.Printf("Successfully started a timer for Game Room: %s", command[2])
+                        log.Printf("Successfully started a timer on Time Server 1 for Game Room: %s", command[2])
+                    }
+                    //Time Server 2
+                    err = timeserver_2_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                    if err != nil {
+                        //Proxy not connected, error, proxy replication
+                        log.Printf("Problem starting a timer on Time Server 2 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                    } else {
+                        //successful start of a timer for Game Room
+                        log.Printf("Successfully started a timer on Time Server 2 for Game Room: %s", command[2])
                     }
 					gameRooms[command[2]].numOfPlayersAnswered = 0
 					gameRooms[command[2]].numOfPlayersAnsweredCorrect = 0
@@ -358,7 +376,7 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 			//Disconnect:Username:AccessCode:TimeStamp
 			//Proxy informs us that the client disconnected
 			gameRoomsMutex.Lock()
-			//let's check if game exists (was it deleted during a server crash?)
+			//Check if the game Room was deleted before the server responded upon crash
 			_, ok := gameRooms[command[2]]
 			if !ok {
 				log.Printf("The room was previously deleted.")
@@ -423,7 +441,24 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 								} else {
 									log.Printf("Message Everyone Responded was sent to the proxy.\n")
 								}
-								timer = time.Now()
+								//Time Server 1
+                                err = timeserver_1_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                                if err != nil {
+                                    //Proxy not connected, error, proxy replication
+                                    log.Printf("Problem starting a timer on Time Server 1 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                                } else {
+                                    //successful start of a timer for Game Room
+                                    log.Printf("Successfully started a timer on Time Server 1 for Game Room: %s", command[2])
+                                }
+                                //Time Server 2
+                                err = timeserver_2_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                                if err != nil {
+                                    //Proxy not connected, error, proxy replication
+                                    log.Printf("Problem starting a timer on Time Server 2 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                                } else {
+                                    //successful start of a timer for Game Room
+                                    log.Printf("Successfully started a timer on Time Server 2 for Game Room: %s", command[2])
+                                }
 								updateRoom(db, gameRooms[command[2]])
 							} else {
 							    //Last Round ended, let's send leaderboard
@@ -513,7 +548,24 @@ func handleGameConnection(db *sql.DB, conn net.Conn) {
 							} else {
 								log.Printf("Message All Ready was sent to the proxy.\n")
 							}
-							timer = time.Now()
+                            //Time Server 1
+                            err = timeserver_1_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                            if err != nil {
+                                //Proxy not connected, error, proxy replication
+                                log.Printf("Problem starting a timer on Time Server 1 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                            } else {
+                                //successful start of a timer for Game Room
+                                log.Printf("Successfully started a timer on Time Server 1 for Game Room: %s", command[2])
+                            }
+                            //Time Server 2
+                            err = timeserver_2_conn.WriteMessage(1, []byte("Start Timer:" + command[2]))
+                            if err != nil {
+                                //Proxy not connected, error, proxy replication
+                                log.Printf("Problem starting a timer on Time Server 2 for Game Room: %s, Error: %s\n", command[2], err.Error())
+                            } else {
+                                //successful start of a timer for Game Room
+                                log.Printf("Successfully started a timer on Time Server 2 for Game Room: %s", command[2])
+                            }
 						} else {
 							//not all players are ready, send disconnect message to proxy
 							_, err = conn.Write([]byte("Lobby Disconnect:" + command[1]))

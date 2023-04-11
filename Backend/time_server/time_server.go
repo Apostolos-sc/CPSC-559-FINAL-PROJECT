@@ -6,9 +6,38 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"fmt"
 )
 
 func main() {
+	var portRead = -5
+	log.Printf("Please give the port number that the server will be servicing Application Servers on (between 6600 and 6620) :.\n")
+	_, scanErr := fmt.Scan(&portRead)
+	for scanErr != nil || portRead < 6600 || portRead > 6620 {
+		if scanErr == nil {
+			log.Printf("Port number for Application Server Registration must be between 6600 and 6620.\n")
+		} else {
+			log.Print("Scan for port failed, due to error : ", scanErr.Error())
+		}
+		_, scanErr = fmt.Scan(&portRead)
+		log.Printf("Please give the port number that the server will be servicing Application Servers on (between 6600 and 6620):.\n")
+	}
+	SERVER_REGISTRATION.port = strconv.Itoa(portRead)
+	log.Printf("Read Server Registration Port # : %d.\n", portRead)
+	portRead = -5
+	log.Printf("Please give the port number that the server will be servicing Clients on (between 7000 and 7010) :.\n")
+	_, scanErr = fmt.Scan(&portRead)
+	for scanErr != nil || portRead < 7000 || portRead > 7010 {
+		if scanErr == nil {
+			log.Printf("Port number for Client Registration must be between 7000 and 7010.\n")
+		} else {
+			log.Print("Scan for port failed, due to error : ", scanErr.Error())
+		}
+		_, scanErr = fmt.Scan(&portRead)
+		log.Printf("Please give the port number that the server will be servicing Clients on (between 6600 and 6620):.\n")
+	}
+	CLIENT_SERVICE.port = strconv.Itoa(portRead)
+	log.Printf("Read Client Registration Port # : %d.\n", portRead)
 	log.Printf("In main")
 	go serverListener()
 	log.Printf("after server listener started")
@@ -21,12 +50,6 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 	log.Printf("In handle client request")
 	var n int
 	buffer := make([]byte, 1024)
-// 	err = clientConn.WriteMessage(1, []byte("Time Server: Connection Established"))
-// 	if err != nil {
-// 		log.Println("Failed to send a message to the client. Time Server Connection will be terminated.")
-// 	} else {
-// 		log.Printf("Message send to the client with ID : %d.\n", connID)
-// 	}
 	// Add client to a gameroom based on client websocket connection
 	for {
 		_, buffer, err = clientConn.ReadMessage()
@@ -109,8 +132,10 @@ func handleServerRegistration(conn *websocket.Conn) {
 					"the remote Address of server in Time Server, Error : %s.", err.Error())
 			}
 			log.Printf("Command : %v. Send Accepted.\n", string(buffer[:]))
-			conn.WriteMessage(1, []byte("Accepted"))
-
+			err = conn.WriteMessage(1, []byte("Accepted"))
+			if err != nil {
+			    log.Printf("Error when sending response : %s", err.Error())
+			}
 		} else if strings.Compare(command[0], "Start Timer") == 0 {
 			// Strat Timer:accesscode:round
 			if gameRooms[command[1]].ticker != nil {
@@ -141,9 +166,6 @@ func handleServerRegistration(conn *websocket.Conn) {
 					}
 				}
 			}()
-// 			time.Sleep(time.Duration(allowed_time) * time.Second) // Stopping the timer at the end of 31 secs
-// 			ticker.Stop()
-// 			done <- true
 		} else if strings.Compare(command[0], "Create Room") == 0 {
 		    log.Printf("hello")
 			// Protocol Game Over:accesscode
