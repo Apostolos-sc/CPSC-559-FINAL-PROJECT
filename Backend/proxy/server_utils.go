@@ -5,17 +5,19 @@ import (
 	"net"
 	"strings"
 	"time"
+	"strconv"
 )
 
-//Uncomment this part
-//func disconnectServerInform(roomConnection net.Conn, username string, accessCode string) {
-//	log.Printf("User %s, is trying to disconnect from room %s", username, accessCode)
-//	_, err := roomConnection.Write([]byte("Disconnect:" + username + ":" + accessCode + ":" + strconv.FormatInt(time_stamp, 10)))
-//	if err != nil {
-//		log.Printf("Sending the following Disconnect information to the server \"Discconect:%s:%s to server\" %s failed. Error : %s\n", username, accessCode, roomConnection.RemoteAddr().String(), err.Error())
-//		//handle error -> server crashed, need to switch servers
-//	}
-//}
+func disconnectServerInform(roomConnection net.Conn, username string, accessCode string) {
+	now := time.Now()
+	time_stamp := now.UnixNano()
+	log.Printf("User %s, is trying to disconnect from room %s", username, accessCode)
+	_, err := roomConnection.Write([]byte("Disconnect:" + username + ":" + accessCode + ":" + strconv.FormatInt(time_stamp, 10)))
+	if err != nil {
+		log.Printf("Sending the following Disconnect information to the server \"Discconect:%s:%s to server\" %s failed. Error : %s\n", username, accessCode, roomConnection.RemoteAddr().String(), err.Error())
+		//handle error -> server crashed, need to switch servers
+	}
+}
 
 func disconnectClientInforming(accessCode string, username string) {
 	//for key, value in range:

@@ -54,11 +54,12 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 	for {
 		_, buffer, err = clientConn.ReadMessage()
 		if err != nil {
-		    log.Print("Client Sent Message : %s.", string(buffer[:len(buffer)]))
+		    log.Printf("Client Sent Message : %s.", string(buffer[:len(buffer)]))
 			if strings.Compare(username, "") == 0 {
 				//Player disconnected before making a request to the server
 				// Remove the client if disconnection detected
 				log.Println("Failed to read a request from the client. Connection will be terminated.")
+				clientConn.Close()
 			} else {
 				//We need to remove from gameMap
 				//lock the specific room
@@ -93,10 +94,19 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 			    username = command[2]
 			    accessCode = command[1]
 				// format of message: Client Join:accessCode:username
-                gameRooms[command[1]].localMutex.Lock()
-                gameRooms[command[1]].players[command[2]] = clientConn
-				gameRooms[command[1]].localMutex.Unlock()
-				log.Printf("Player %s from room %s, successfully joined the time server. ", username, accessCode)
+				gameRoomMutex.Lock()
+				_, ok := gameRooms[command[1]]
+				if ok {
+					gameRooms[command[1]].players[command[2]] = clientConn
+					gameRoomMutex.Unlock()
+					log.Printf("Player %s from room %s, successfully joined the time server. ", username, accessCode)
+				} else {
+					log.Printf("Player %s cannot register to game Room %s because it doesn't exist.", username, accessCode)
+					clientConn.Close()
+					gameRoomMutex.Unlock()
+					break
+				}
+				
 			} else {
 				log.Printf("Unrecognized message format from the " +
 					"client, terminating connection")
@@ -115,12 +125,16 @@ func handleServerRegistration(conn *websocket.Conn) {
 	for {
 
 		_, buffer, err = conn.ReadMessage()
+		if err != nil {
+			log.Printf("There was an issue with reading from the potential Server with IP %s. Error : %s.\n", conn.RemoteAddr(), err.Error())
+			log.Printf("Connection will be terminated.")
+			conn.Close()
+			break
+		}
 		n = len(buffer)
 		log.Printf("The buffer is %s", buffer)
 		log.Printf("the string buffer is %s", "_"+string(buffer[:n])+"_")
-		if err != nil {
-			log.Printf("There was an issue with reading from the potential Server with IP %s. Error : %s.\n", conn.RemoteAddr(), err.Error())
-		}
+
 		var command = strings.Split(string(buffer[:n]), ":")
 		log.Printf("command [0] is %s", command[0])
 		log.Printf("command is %s", command)
@@ -172,6 +186,8 @@ func handleServerRegistration(conn *websocket.Conn) {
 			gameRoomMutex.Lock()
 			_, ok := gameRooms[command[1]]
 			if !ok {
+				//Check to make sure that the game room was not already created, this can happen only if the server crashed before the Ready command was fully completed
+				//ie, after the Create Room instruction and before sending that all Players are ready to proxy
 			    gameRooms[command[1]] = &gameRoom {currentRound:0, players: make(map[string]*websocket.Conn), ticker: nil}
 			    log.Printf("Creating game Room")
 			}
@@ -185,13 +201,9 @@ func handleServerRegistration(conn *websocket.Conn) {
             }
             gameRoomMutex.Unlock()
         }else {
-			log.Printf("Invalid command by the server")
-			err = conn.WriteMessage(1, []byte("Wrong command given, access declined - Time server."))
-			if err != nil {
-				log.Printf("Time server connection failed unexpectedly %s", err.Error())
-				conn.Close()
-				break
-			}
+			log.Printf("Invalid command by the server with IP address %s. Connection will now be terminated.", conn.RemoteAddr())
+			conn.Close()
+			break
 		}
 	}
 }

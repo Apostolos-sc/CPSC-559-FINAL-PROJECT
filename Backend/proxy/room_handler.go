@@ -11,8 +11,6 @@ import (
 
 func handleClientRequest(clientConn *websocket.Conn, connID int) {
      var timeout = 5*time.Second
-//     SetReadDeadline(time.Now().Add(timeout))
-// SetReadDeadline(time.Now().Add(time.Time{})
 	var time_stamp int64
 	var service_completed = true
 	var command []string
@@ -70,6 +68,7 @@ func handleClientRequest(clientConn *websocket.Conn, connID int) {
 						if err != nil {
 							log.Printf("Sending the following Disconnect information to the server \"Discconect:%s:%s to server\" %s failed. Error : %s\n", previousCommandString[1], previousCommandString[2], gameRoomConn.RemoteAddr(), err.Error())
 							gameRooms[previousCommandString[2]].gameRoomConn.SetWriteDeadline(time.Time{})
+							previousCommand = "Disconnect:" + previousCommandString[1] + ":" + previousCommandString[2] + ":" + strconv.FormatInt(time_stamp, 10)
 							gameRoomConn = restartServer()
 							gameRoomMutex.Unlock()
 							continue

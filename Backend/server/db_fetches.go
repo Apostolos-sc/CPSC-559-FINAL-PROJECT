@@ -97,6 +97,28 @@ func fetchRoom(db1 *sql.DB, db2 *sql.DB, accessCode string) error {
 	log.Printf("Successfully loaded Game Room with information %s, %d, %d, %d, %d, %d, %d, %d, %d, %d.\n", room.accessCode, gameRooms[room.accessCode].currentRound, gameRooms[room.accessCode].numOfPlayersAnswered, gameRooms[room.accessCode].numOfPlayersAnsweredCorrect, gameRooms[room.accessCode].numOfDisconnectedPlayers, gameRooms[room.accessCode].accessCodeTimeStamp, gameRooms[room.accessCode].currentRoundTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredCorrectTimeStamp, gameRooms[room.accessCode].numOfDisconnectedPlayersTimeStamp)
 	return nil
 }
+func fetchRoomByTimeStamp(db1 *sql.DB, db2 *sql.DB, time_stamp int64) (*gameRoom, error) {
+    db := ping(db1, db2)
+	log.Printf("Getting Game Room with time stamp : %d", time_stamp)
+	query := "select * from gameRoom WHERE accessCodeTimeStamp = ?;"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancelfunc()
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Printf("Error %s when preparing SQL statement", err)
+		return nil, err
+	}
+	defer stmt.Close()
+	var room gameRoom
+	row := stmt.QueryRowContext(ctx, time_stamp)
+	err = row.Scan(&room.accessCode, &room.currentRound, &room.numOfPlayersAnswered, &room.numOfPlayersAnsweredCorrect, &room.numOfDisconnectedPlayers, &room.accessCodeTimeStamp, &room.currentRoundTimeStamp, &room.numOfPlayersAnsweredTimeStamp, &room.numOfPlayersAnsweredCorrectTimeStamp, &room.numOfDisconnectedPlayersTimeStamp)
+	if err != nil {
+		log.Printf("There was an error while fetching game room with time_stamp %d.", time_stamp)
+		return nil, err
+	}
+	log.Printf("Successfully loaded Game Room with information %s, %d, %d, %d, %d, %d, %d, %d, %d, %d.\n", room.accessCode, room.currentRound, room.numOfPlayersAnswered, room.numOfPlayersAnsweredCorrect, room.numOfDisconnectedPlayers, room.accessCodeTimeStamp, room.currentRoundTimeStamp, room.numOfPlayersAnsweredTimeStamp, room.numOfPlayersAnsweredCorrectTimeStamp, room.numOfDisconnectedPlayersTimeStamp)
+	return &gameRoom{accessCode: room.accessCode, currentRound: room.currentRound, numOfPlayersAnswered: room.numOfPlayersAnswered, numOfPlayersAnsweredCorrect: room.numOfPlayersAnsweredCorrect, numOfDisconnectedPlayers: room.numOfDisconnectedPlayers, accessCodeTimeStamp: room.accessCodeTimeStamp,currentRoundTimeStamp: room.currentRoundTimeStamp, numOfPlayersAnsweredTimeStamp: room.numOfPlayersAnsweredTimeStamp, numOfPlayersAnsweredCorrectTimeStamp: room.numOfPlayersAnsweredCorrectTimeStamp, numOfDisconnectedPlayersTimeStamp: room.numOfDisconnectedPlayersTimeStamp, questions: make(map[int]*Question), players: make(map[string]*roomUser)}, err
+}
 func fetchRooms(db1 *sql.DB, db2 *sql.DB,) error {
     db := ping(db1, db2)
 	log.Printf("Getting games")
@@ -121,7 +143,7 @@ func fetchRooms(db1 *sql.DB, db2 *sql.DB,) error {
 			return err
 		}
 		gameRooms[room.accessCode] = &gameRoom{accessCode: room.accessCode, currentRound: room.currentRound, numOfPlayersAnswered: room.numOfPlayersAnswered, numOfPlayersAnsweredCorrect: room.numOfPlayersAnsweredCorrect, numOfDisconnectedPlayers: room.numOfDisconnectedPlayers, accessCodeTimeStamp: room.accessCodeTimeStamp,currentRoundTimeStamp: room.currentRoundTimeStamp, numOfPlayersAnsweredTimeStamp: room.numOfPlayersAnsweredTimeStamp, numOfPlayersAnsweredCorrectTimeStamp: room.numOfPlayersAnsweredCorrectTimeStamp, numOfDisconnectedPlayersTimeStamp: room.numOfDisconnectedPlayersTimeStamp, questions: make(map[int]*Question), players: make(map[string]*roomUser)}
-		log.Printf("Successfully loaded Game Room with information %s, %d, %d, %d, %d,%d, %d, %d, %d.\n", room.accessCode, gameRooms[room.accessCode].currentRound, gameRooms[room.accessCode].numOfPlayersAnswered, gameRooms[room.accessCode].numOfPlayersAnsweredCorrect, gameRooms[room.accessCode].numOfDisconnectedPlayers, gameRooms[room.accessCode].accessCodeTimeStamp, gameRooms[room.accessCode].currentRoundTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredCorrectTimeStamp, gameRooms[room.accessCode].numOfDisconnectedPlayersTimeStamp)
+		log.Printf("Successfully loaded Game Room with information %s, %d, %d, %d, %d, %d,%d, %d, %d, %d.\n", room.accessCode, gameRooms[room.accessCode].currentRound, gameRooms[room.accessCode].numOfPlayersAnswered, gameRooms[room.accessCode].numOfPlayersAnsweredCorrect, gameRooms[room.accessCode].numOfDisconnectedPlayers, gameRooms[room.accessCode].accessCodeTimeStamp, gameRooms[room.accessCode].currentRoundTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredTimeStamp, gameRooms[room.accessCode].numOfPlayersAnsweredCorrectTimeStamp, gameRooms[room.accessCode].numOfDisconnectedPlayersTimeStamp)
 	}
 	if err := rows.Err(); err != nil {
 		return err
